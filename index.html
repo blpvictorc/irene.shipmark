@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shipping & Shipmark Management System - Web App R5</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Reading Source Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- ExcelJS for Rich Styled Excel Export with Embedded Images, Borders & Colors -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <!-- JSZip for Batch ZIP Download of Multiple Vendor Files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f1f5f9;
+        }
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .double-border-box {
+            border: 4px double #000000;
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-[1750px] mx-auto px-6 py-3.5 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 p-2 rounded-lg shadow-inner">
+                    <i class="fa-solid fa-ship text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-wide flex items-center gap-2">
+                        Shipping &amp; Shipmark Web System
+                        <span class="bg-blue-500/20 text-blue-300 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-blue-400/30">Web 1.0</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Based on core v.5.0 by Victor Chong</p>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="flex items-center gap-3">
+                <div class="flex items-center space-x-1.5 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                    <button onclick="switchTab('workspace')" id="tab-workspace" class="px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all bg-blue-600 text-white shadow flex items-center gap-1.5">
+                        <i class="fa-solid fa-table-cells"></i>
+                        <span>1. Cargo Volume &amp; Data</span>
+                        <span id="badge-cv-count" class="bg-blue-800 text-blue-100 text-[10px] px-1.5 py-0.2 rounded-full mono-font">0</span>
+                    </button>
+                    <button onclick="switchTab('mapping')" id="tab-mapping" class="px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all text-slate-300 hover:text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>2. Auto / Custom Mapping</span>
+                        <span id="badge-sheet-count" class="bg-slate-700 text-slate-300 text-[10px] px-1.5 py-0.2 rounded-full mono-font">0</span>
+                    </button>
+                    <button onclick="switchTab('shipmark')" id="tab-shipmark" class="px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all text-slate-300 hover:text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-file-export"></i>
+                        <span>3. Vendor Shipmark Export</span>
+                        <span id="badge-file-count" class="bg-slate-700 text-slate-300 text-[10px] px-1.5 py-0.2 rounded-full mono-font">0</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-[1750px] w-full mx-auto px-6 py-6 space-y-6">
+
+        <!-- ==================== STEP 1: GLOBAL CONTROL & UPLOAD BAR ==================== -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <span class="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-0.5 rounded-md border border-blue-200">Control Hub</span>
+                        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700">
+                            Upload Order File &amp; Select Month Filter (Menu C3)
+                        </h2>
+                    </div>
+                    <p class="text-xs text-slate-500">
+                        Upload <code class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-semibold">BNTCA Order 2026.xlsx</code>. You can edit table values directly in Tab 1 or via Preview Modal; changes instantly update vendor files.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap items-end gap-3">
+                    <!-- Month Selector (Menu C3) -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">
+                            Target Month <span class="text-slate-400">(Menu C3)</span>
+                        </label>
+                        <select id="menu-c3" onchange="onMonthFilterChange()" class="px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                            <option value="JAN">JAN</option>
+                            <option value="FEB">FEB</option>
+                            <option value="MAR">MAR</option>
+                            <option value="APR">APR</option>
+                            <option value="MAY">MAY</option>
+                            <option value="JUN">JUN</option>
+                            <option value="JUL">JUL</option>
+                            <option value="AUG" selected>AUG</option>
+                            <option value="SEP">SEP</option>
+                            <option value="OCT">OCT</option>
+                            <option value="NOV">NOV</option>
+                            <option value="DEC">DEC</option>
+                        </select>
+                    </div>
+
+                    <!-- Date Stamp for Shipmark File Name -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">
+                            Export Date Stamp <span class="text-slate-400">(File Name)</span>
+                        </label>
+                        <input type="text" id="export-date-str" value="" oninput="if(rawSourceWorkbook) { buildVendorShipmarkPackages(); renderShipmarkCards(); }"
+                            class="px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 w-36 mono-font">
+                    </div>
+
+                    <!-- Primary Upload: BNTCA Order File -->
+                    <div>
+                        <label class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition cursor-pointer flex items-center gap-2">
+                            <i class="fa-solid fa-file-excel text-sm"></i>
+                            <span id="upload-btn-text">1. Upload Order Excel (BNTCA)</span>
+                            <input type="file" id="file-import" accept=".xlsx, .xls, .xlsm, .xlsb" class="hidden" onchange="handleOrderExcelUpload(event)">
+                        </label>
+                    </div>
+
+                    <!-- Optional Secondary Upload: Loading Plan Match -->
+                    <div>
+                        <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition cursor-pointer flex items-center gap-2" title="Optional: Upload Loading Plan">
+                            <i class="fa-solid fa-ruler-combined text-sm"></i>
+                            <span>2. Match L/W/H Plan</span>
+                            <input type="file" id="file-match-plan" accept=".xlsx, .xls, .xlsm, .xlsb" class="hidden" onchange="handleLoadingPlanMatch(event)">
+                        </label>
+                    </div>
+
+                    <!-- Persistent Shipmark Template Image Upload (Permanent Memory) -->
+                    <div>
+                        <label class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition cursor-pointer flex items-center gap-2" title="Upload Shipmark graphic once, permanently remembered">
+                            <i class="fa-solid fa-image text-sm"></i>
+                            <span id="img-upload-label">3. Upload Shipmark Image (Memory)</span>
+                            <input type="file" id="file-template-image" accept="image/png, image/jpeg" class="hidden" onchange="handleTemplateImageUpload(event)">
+                        </label>
+                    </div>
+
+                    <!-- One-Click Download Everything as ZIP -->
+                    <div>
+                        <button onclick="downloadAllOutputsAsZip()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
+                            <i class="fa-solid fa-file-zipper text-sm"></i>
+                            <span>Download All (CV + Vendor ZIP)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active File Status Bar -->
+            <div id="file-status-bar" class="hidden mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div class="flex flex-wrap items-center gap-4">
+                    <span class="flex items-center gap-1.5 text-slate-600">
+                        <i class="fa-solid fa-circle-check text-emerald-500"></i>
+                        Source File: <strong id="status-filename" class="text-slate-800 mono-font">-</strong>
+                    </span>
+                    <span class="flex items-center gap-1.5 text-slate-600">
+                        <i class="fa-solid fa-layer-group text-blue-500"></i>
+                        Sheets Mapped: <strong id="status-sheets" class="text-slate-800 mono-font">0</strong>
+                    </span>
+                    <span class="flex items-center gap-1.5 text-slate-600">
+                        <i class="fa-solid fa-book-open text-amber-500"></i>
+                        Description Dict Keys: <strong id="status-desc-count" class="text-slate-800 mono-font">0</strong>
+                    </span>
+                    <span id="status-unmapped-badge" class="hidden bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full font-semibold border border-amber-300">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i><span id="status-unmapped-text"></span>
+                    </span>
+                    <span id="status-img-badge" class="bg-purple-100 text-purple-700 px-2.5 py-0.5 rounded-full font-semibold border border-purple-300">
+                        <i class="fa-solid fa-image mr-1"></i><span id="status-img-text">Image Memory: Not Uploaded</span>
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400">Mapping Mode:</span>
+                    <span id="current-mapping-mode-badge" class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-semibold">Auto Smart Header</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 1: WORKSPACE (LIVE EDITABLE CARGO VOLUME) ==================== -->
+        <div id="view-workspace" class="space-y-6">
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase text-slate-400">Filtered Month</p>
+                        <p id="stat-month" class="text-2xl font-bold text-blue-600 mono-font mt-0.5">AUG</p>
+                    </div>
+                    <div class="bg-blue-50 text-blue-600 w-10 h-10 rounded-lg flex items-center justify-center">
+                        <i class="fa-solid fa-calendar-check text-lg"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase text-slate-400">Cargo Volume Rows</p>
+                        <p id="stat-cv-rows" class="text-2xl font-bold text-slate-800 mono-font mt-0.5">0</p>
+                    </div>
+                    <div class="bg-emerald-50 text-emerald-600 w-10 h-10 rounded-lg flex items-center justify-center">
+                        <i class="fa-solid fa-boxes-stacked text-lg"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase text-slate-400">Unique Vendors (Factories)</p>
+                        <p id="stat-vendors" class="text-2xl font-bold text-slate-800 mono-font mt-0.5">0</p>
+                    </div>
+                    <div class="bg-purple-50 text-purple-600 w-10 h-10 rounded-lg flex items-center justify-center">
+                        <i class="fa-solid fa-industry text-lg"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase text-slate-400">Vietnam / OT / Normal Split</p>
+                        <p id="stat-split-counts" class="text-lg font-bold text-slate-800 mono-font mt-1">0 / 0 / 0</p>
+                    </div>
+                    <div class="bg-amber-50 text-amber-600 w-10 h-10 rounded-lg flex items-center justify-center">
+                        <i class="fa-solid fa-code-branch text-lg"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase text-slate-400">Vendor Excel Files Ready</p>
+                        <p id="stat-total-files" class="text-2xl font-bold text-emerald-600 mono-font mt-0.5">0</p>
+                    </div>
+                    <div class="bg-teal-50 text-teal-600 w-10 h-10 rounded-lg flex items-center justify-center">
+                        <i class="fa-solid fa-file-arrow-down text-lg"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cargo Volume Table Section -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-800 text-white px-5 py-3.5 flex flex-wrap justify-between items-center gap-3">
+                    <div class="flex items-center space-x-3">
+                        <span class="px-3 py-1 rounded text-xs font-bold bg-blue-600 text-white flex items-center gap-1.5">
+                            <i class="fa-solid fa-table-list"></i>
+                            <span>Cargo Volume (Cols A–U) - Live Editable</span>
+                        </span>
+                        <span id="cv-row-count" class="text-xs text-slate-300 mono-font">0 rows loaded</span>
+                    </div>
+
+                    <div class="flex items-center gap-2.5">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2 text-slate-400 text-xs"></i>
+                            <input type="text" id="table-search" oninput="renderWorkspaceTables()" placeholder="Search PO, MFR#, Vendor, Sheet..." 
+                                class="pl-8 pr-3 py-1 bg-slate-700 border border-slate-600 rounded-lg text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-400 w-56">
+                        </div>
+                        <button onclick="exportCargoVolumeExcel()" class="bg-blue-600 hover:bg-blue-700 text-xs font-semibold px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow">
+                            <i class="fa-solid fa-download"></i> Export Cargo Volume (.xlsx)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TABLE: CARGO VOLUME (LIVE EDITABLE) -->
+                <div id="container-cv-table" class="overflow-x-auto max-h-[580px]">
+                    <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
+                        <thead class="bg-slate-100 text-slate-600 uppercase sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th class="py-2.5 px-3 border-b border-r text-center">#</th>
+                                <th class="py-2.5 px-3 border-b border-r">A: Order</th>
+                                <th class="py-2.5 px-3 border-b border-r">B: Asst No.</th>
+                                <th class="py-2.5 px-3 border-b border-r">C: Description</th>
+                                <th class="py-2.5 px-3 border-b border-r text-right">D: Qty</th>
+                                <th class="py-2.5 px-3 border-b border-r text-right">E: Ctn</th>
+                                <th class="py-2.5 px-3 border-b border-r text-right">F: L</th>
+                                <th class="py-2.5 px-3 border-b border-r text-right">G: W</th>
+                                <th class="py-2.5 px-3 border-b border-r text-right">H: H</th>
+                                <th class="py-2.5 px-3 border-b border-r text-center">I: Pack</th>
+                                <th class="py-2.5 px-3 border-b border-r text-right">J: CBM</th>
+                                <th class="py-2.5 px-3 border-b border-r text-right">K: Total CBM</th>
+                                <th class="py-2.5 px-3 border-b border-r">L: Vendor</th>
+                                <th class="py-2.5 px-3 border-b border-r">M: C/O</th>
+                                <th class="py-2.5 px-3 border-b border-r">N: OBS Date</th>
+                                <th class="py-2.5 px-3 border-b border-r">O: QCI Date</th>
+                                <th class="py-2.5 px-3 border-b border-r">P: BNA C/O#</th>
+                                <th class="py-2.5 px-3 border-b border-r">Q: BNA P/O#</th>
+                                <th class="py-2.5 px-3 border-b border-r">R: BNTCA PO#</th>
+                                <th class="py-2.5 px-3 border-b border-r">S: Acumatica</th>
+                                <th class="py-2.5 px-3 border-b border-r">T: Notes</th>
+                                <th class="py-2.5 px-3 border-b">U: Sheet</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cv-tbody" class="divide-y divide-slate-200 mono-font">
+                            <tr>
+                                <td colspan="22" class="py-12 text-center text-slate-400">
+                                    <i class="fa-solid fa-file-circle-plus text-2xl mb-2 block text-slate-300"></i>
+                                    No data imported yet. Please upload <strong class="text-slate-600">BNTCA Order 2026.xlsx</strong> above.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 2: AUTO / CUSTOM MAPPING EDITOR ==================== -->
+        <div id="view-mapping" class="hidden space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-0.5 rounded">Smart Mapping Engine</span>
+                            <h2 class="text-base font-bold text-slate-800">Worksheet Column Mapping Matrix (Auto-Detect &amp; Manual Override)</h2>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Each worksheet in <code class="bg-slate-100 px-1 rounded">BNTCA Order 2026</code> can have different column positions. System automatically scans Row 3 headers, and you can fine-tune any column letter below.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <button onclick="applyAutoHeaderMappingAll()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-sm transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Re-Run Smart Auto Mapping
+                        </button>
+                        <button onclick="applyLegacyR5MappingPreset()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-sm transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-clock-rotate-left"></i> Load R5 Static Preset
+                        </button>
+                        <button onclick="reprocessDataWithCurrentMapping()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-rotate"></i> Apply Changes &amp; Refresh Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Mapping Table Container -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
+                        <thead class="bg-slate-800 text-white uppercase">
+                            <tr id="mapping-thead-row">
+                                <th class="py-2.5 px-3 border-r border-slate-700 sticky left-0 bg-slate-800 z-10">Target Field</th>
+                                <th class="py-2.5 px-3 border-r border-slate-700">CV Col</th>
+                                <th class="py-2.5 px-3 border-r border-slate-700">Vendor File Col</th>
+                                <th class="py-2.5 px-4 text-slate-400 italic">Upload an Excel file to inspect &amp; adjust per-sheet mappings...</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mapping-tbody" class="divide-y divide-slate-200 mono-font">
+                            <tr>
+                                <td colspan="4" class="py-8 text-center text-slate-400">Please upload an Order Excel file first to view worksheet mappings.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Legend / Notes -->
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-3.5 text-xs text-slate-600 flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex flex-wrap items-center gap-4">
+                        <span><strong class="text-slate-800">Tip:</strong> Each cell shows the mapped <span class="mono-font font-bold text-blue-600">Column Letter</span> + detected <span class="text-slate-500">Header Name</span> from Row 3 of that sheet.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB 3: VENDOR SHIPMARK GENERATOR & EXPORT (3-COLUMN GROUPED LAYOUT) ==================== -->
+        <div id="view-shipmark" class="hidden space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="bg-purple-100 text-purple-700 text-xs font-bold px-2.5 py-0.5 rounded">1:1 Exact Format Generator</span>
+                            <h2 class="text-base font-bold text-slate-800">Vendor Shipmark Excel Files (Grouped by Color / Priority Columns)</h2>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Cards are automatically sorted and grouped under their respective color banners (Vietnam on left, OT in middle, Normal on right).
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <button onclick="downloadAllVendorShipmarksZip()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
+                            <i class="fa-solid fa-file-zipper"></i> Download All Vendor Files (.ZIP)
+                        </button>
+                        <button onclick="downloadAllVendorFilesSequentially()" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Download Individual .xlsx Files
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Priority Rules Banner -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div class="bg-rose-50/70 border border-rose-200 rounded-lg p-3.5 flex items-start space-x-3">
+                        <span class="bg-rose-600 text-white font-bold px-2 py-0.5 rounded text-[10px] mt-0.5">PRIORITY 1</span>
+                        <div>
+                            <p class="font-bold text-rose-900">Vietnam Format (<code class="mono-font">shipmarktempViet</code>)</p>
+                            <p class="text-rose-700 mt-0.5">If <code class="font-semibold">Country == "VIETNAM"</code>. Listed in the Red Column.</p>
+                        </div>
+                    </div>
+                    <div class="bg-amber-50/70 border border-amber-200 rounded-lg p-3.5 flex items-start space-x-3">
+                        <span class="bg-amber-600 text-white font-bold px-2 py-0.5 rounded text-[10px] mt-0.5">PRIORITY 2</span>
+                        <div>
+                            <p class="font-bold text-amber-900">Electronics OT Format (<code class="mono-font">shipmarktempOT</code>)</p>
+                            <p class="text-amber-700 mt-0.5">Non-Vietnam &amp; <code class="font-semibold">Category == "ELECTRONICS"</code>. Listed in the Amber/Orange Column.</p>
+                        </div>
+                    </div>
+                    <div class="bg-emerald-50/70 border border-emerald-200 rounded-lg p-3.5 flex items-start space-x-3">
+                        <span class="bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] mt-0.5">PRIORITY 3</span>
+                        <div>
+                            <p class="font-bold text-emerald-900">Standard Normal Format (<code class="mono-font">shipmarktemp</code>)</p>
+                            <p class="text-emerald-700 mt-0.5">All other items. Listed in the Green Column.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generated Vendor File Cards 3-Column Grid -->
+                <div id="shipmark-files-grid" class="pt-2">
+                    <div class="col-span-full py-12 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                        <i class="fa-solid fa-folder-open text-2xl mb-2 block text-slate-300"></i>
+                        No Vendor Shipmark files generated yet. Upload an Order file in Step 1.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ==================== MODAL: PREVIEW SINGLE VENDOR SHIPMARK FILE (FULLY EDITABLE) ==================== -->
+    <div id="modal-shipmark-preview" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-7xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+            <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <span id="modal-preview-badge" class="bg-blue-600 text-xs font-bold px-2.5 py-0.5 rounded">NORMAL</span>
+                    <h3 id="modal-preview-title" class="text-sm font-bold mono-font">BAI_SHIPMARK ORDER.xlsx</h3>
+                    <span class="bg-emerald-500/20 text-emerald-300 text-[11px] px-2 py-0.5 rounded border border-emerald-400/30">Live Editable Preview</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="modal-download-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-download"></i> Download Exact .xlsx (with Images)
+                    </button>
+                    <button onclick="closeShipmarkPreviewModal()" class="text-slate-400 hover:text-white px-2 py-1 text-lg">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="modal-preview-body" class="p-6 overflow-y-auto space-y-4 text-xs flex-1"></div>
+        </div>
+    </div>
+
+    <!-- Datalist for MFR# auto-suggestions -->
+    <datalist id="mfr-suggestions"></datalist>
+
+    <!-- ==================== MODAL: COLUMN C DESCRIPTION MISMATCH (MODULE 1) ==================== -->
+    <div id="modal-mismatch" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden">
+            <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="text-sm font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-code-compare text-amber-400"></i>
+                    Column C Description Mismatch (<span id="mismatch-counter">1 / 1</span>)
+                </h3>
+            </div>
+            <div class="p-6 space-y-4 text-xs">
+                <p class="text-slate-500">Row <strong id="mismatch-row-info" class="text-slate-800"></strong> has different descriptions between the Order Tool and Cargo Volume Plan:</p>
+                <div class="p-3.5 bg-blue-50 border border-blue-200 rounded-xl">
+                    <p class="text-[10px] font-bold uppercase text-blue-600 mb-1">Current Order Tool Description [Yes - Keep]</p>
+                    <p id="mismatch-tool-val" class="font-bold text-slate-800 mono-font text-sm"></p>
+                </div>
+                <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p class="text-[10px] font-bold uppercase text-amber-700 mb-1">Imported Cargo Volume Plan Description [No - Replace]</p>
+                    <p id="mismatch-import-val" class="font-bold text-slate-800 mono-font text-sm"></p>
+                </div>
+                <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                    <button onclick="resolveMismatchChoice(true)" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg transition">
+                        Keep Tool [Yes]
+                    </button>
+                    <button onclick="resolveMismatchChoice(false)" class="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg transition">
+                        Use Cargo Volume [No]
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl border border-slate-700 flex items-center space-x-3">
+            <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+            <div>
+                <p id="toast-title" class="text-sm font-bold">Success</p>
+                <p id="toast-msg" class="text-xs text-slate-300">Operation completed.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== JAVASCRIPT ENGINE ==================== -->
+    <script>
+        // =========================================================================
+        // 1. GLOBAL STATE & DEFINITIONS (WITH PERSISTENT IMAGE MEMORY)
+        // =========================================================================
+        let rawSourceWorkbook = null;
+        let rawSourceFileName = '';
+        let descriptionLookupDict = {};
+        let sheetHeadersMap = {};
+        let sheetMappingConfig = {};
+
+        let globalCargoVolumeRows = [];
+        let globalTempShipmarkRows = [];
+        let generatedVendorPackages = [];
+
+        let userUploadedShipmarkImageBase64 = localStorage.getItem('bntca_shipmark_custom_img') || null;
+        let cachedUN3091ImageBase64 = null;
+
+        let mismatchQueue = [];
+        let currentMismatchIdx = 0;
+
+        const EXCLUDED_SHEETS = ['Description', 'Blank', 'Note'];
+
+        const MAPPING_FIELDS = [
+            { key: 'order', label: 'Order (Month)', cvCol: 'A', tsCol: '-', matchKeywords: ['order'] },
+            { key: 'asstNo', label: 'Asst No. / MFR#', cvCol: 'B', tsCol: 'E', matchKeywords: ['asst no', 'asst no.', 'mfr#'] },
+            { key: 'desc', label: 'Description', cvCol: 'C', tsCol: 'D', matchKeywords: ['description', 'item description'] },
+            { key: 'qty', label: 'Qty', cvCol: 'D', tsCol: '-', matchKeywords: ['qty', 'quantity'] },
+            { key: 'pack', label: 'Pack / Asst Ratio', cvCol: 'I', tsCol: '(Internal)', matchKeywords: ['asst ratio', 'pack'] },
+            { key: 'vendor', label: 'Vendor / Factory', cvCol: 'L', tsCol: 'F', matchKeywords: ['vendor', 'factory'] },
+            { key: 'co', label: 'C/O / Origin', cvCol: 'M', tsCol: '(Priority Check)', matchKeywords: ['origin', 'c/o', 'country'] },
+            { key: 'obsDate', label: 'OBS Date', cvCol: 'N', tsCol: '-', matchKeywords: ['obs date'] },
+            { key: 'qciDate', label: 'QCI Date', cvCol: 'O', tsCol: '-', matchKeywords: ['qci date'] },
+            { key: 'bnaCO', label: 'BNA C/O#', cvCol: 'P', tsCol: '-', matchKeywords: ['bna c/o#', 'bna c/o'] },
+            { key: 'bnaPO', label: 'BNA P/O# (PO No.)', cvCol: 'Q', tsCol: 'B', matchKeywords: ['bna p/o#', 'bna p/o', 'po no.'] },
+            { key: 'bntcaPO', label: 'BNTCA PO#', cvCol: 'R', tsCol: '-', matchKeywords: ['bntca po no.', 'bntca po#'] }
+        ];
+
+        const R5_STATIC_PRESET = {
+            'AE': { order:'A', asstNo:'C', desc:'G', qty:'H', pack:'F', vendor:'I', co:'J', obsDate:'L', qciDate:'M', bnaCO:'O', bnaPO:'P', bntcaPO:'' },
+            'DM': { order:'A', asstNo:'C', desc:'G', qty:'H', pack:'F', vendor:'I', co:'J', obsDate:'L', qciDate:'M', bnaCO:'O', bnaPO:'P', bntcaPO:'' },
+            'DS': { order:'A', asstNo:'C', desc:'G', qty:'H', pack:'F', vendor:'I', co:'J', obsDate:'L', qciDate:'M', bnaCO:'O', bnaPO:'P', bntcaPO:'' },
+            'GD': { order:'A', asstNo:'C', desc:'G', qty:'H', pack:'F', vendor:'I', co:'J', obsDate:'L', qciDate:'M', bnaCO:'N', bnaPO:'O', bntcaPO:'' },
+            'PI': { order:'A', asstNo:'C', desc:'G', qty:'H', pack:'F', vendor:'I', co:'J', obsDate:'L', qciDate:'M', bnaCO:'N', bnaPO:'O', bntcaPO:'' },
+            'Shakers': { order:'A', asstNo:'C', desc:'G', qty:'H', pack:'F', vendor:'I', co:'J', obsDate:'L', qciDate:'M', bnaCO:'N', bnaPO:'O', bntcaPO:'' },
+            'GZ': { order:'A', asstNo:'F', desc:'J', qty:'K', pack:'I', vendor:'L', co:'M', obsDate:'O', qciDate:'P', bnaCO:'Q', bnaPO:'R', bntcaPO:'' },
+            'TG (Connection)': { order:'A', asstNo:'F', desc:'J', qty:'K', pack:'I', vendor:'L', co:'M', obsDate:'O', qciDate:'P', bnaCO:'Q', bnaPO:'R', bntcaPO:'' },
+            'TG (Original)': { order:'A', asstNo:'F', desc:'J', qty:'K', pack:'I', vendor:'L', co:'M', obsDate:'O', qciDate:'P', bnaCO:'Q', bnaPO:'R', bntcaPO:'' },
+            'TG (Non-LCD)': { order:'A', asstNo:'F', desc:'J', qty:'K', pack:'I', vendor:'L', co:'M', obsDate:'O', qciDate:'P', bnaCO:'Q', bnaPO:'R', bntcaPO:'' },
+            'Tiny Tomo': { order:'A', asstNo:'F', desc:'J', qty:'K', pack:'I', vendor:'L', co:'M', obsDate:'O', qciDate:'P', bnaCO:'Q', bnaPO:'R', bntcaPO:'' },
+            'Monchhichi': { order:'A', asstNo:'F', desc:'J', qty:'K', pack:'I', vendor:'L', co:'M', obsDate:'O', qciDate:'P', bnaCO:'Q', bnaPO:'R', bntcaPO:'' },
+            'Demon Slayer': { order:'A', asstNo:'F', desc:'J', qty:'K', pack:'I', vendor:'L', co:'M', obsDate:'O', qciDate:'P', bnaCO:'Q', bnaPO:'R', bntcaPO:'' },
+            'Anifig': { order:'A', asstNo:'F', desc:'J', qty:'K', pack:'I', vendor:'L', co:'M', obsDate:'O', qciDate:'P', bnaCO:'Q', bnaPO:'R', bntcaPO:'' },
+            'Life': { order:'A', asstNo:'F', desc:'J', qty:'K', pack:'I', vendor:'L', co:'M', obsDate:'O', qciDate:'P', bnaCO:'Q', bnaPO:'R', bntcaPO:'' },
+            'Kirby': { order:'A', asstNo:'F', desc:'J', qty:'K', pack:'I', vendor:'L', co:'M', obsDate:'O', qciDate:'P', bnaCO:'Q', bnaPO:'R', bntcaPO:'' }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const now = new Date();
+            const months = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+            document.getElementById('export-date-str').value = `${months[now.getMonth()]} ${now.getDate()}`;
+            
+            if (userUploadedShipmarkImageBase64) {
+                document.getElementById('status-img-text').textContent = 'Image Memory: Ready (Saved)';
+            }
+            ensureEmbeddedGraphicsReady();
+        });
+
+        // =========================================================================
+        // 2. IMAGE UPLOAD & CANVAS GRAPHICS GENERATORS
+        // =========================================================================
+        function handleTemplateImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                userUploadedShipmarkImageBase64 = evt.target.result;
+                localStorage.setItem('bntca_shipmark_custom_img', userUploadedShipmarkImageBase64);
+                document.getElementById('status-img-text').textContent = 'Image Memory: Updated & Saved';
+                showToast('Image Memory Saved', 'Shipmark image uploaded and permanently stored in browser memory!', 'success');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function getPureBase64(dataUrl) {
+            if (!dataUrl) return '';
+            if (dataUrl.includes(',')) {
+                return dataUrl.split(',')[1];
+            }
+            return dataUrl;
+        }
+
+        function ensureEmbeddedGraphicsReady() {
+            if (!cachedUN3091ImageBase64) {
+                cachedUN3091ImageBase64 = generateUN3091LabelDataURL();
+            }
+        }
+
+        function generateUN3091LabelDataURL() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 580;
+            canvas.height = 460;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const bx = 135, by = 20, bw = 310, bh = 365;
+            const borderW = 24;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(bx, by, bw, bh);
+            ctx.rect(bx + borderW, by + borderW, bw - borderW * 2, bh - borderW * 2);
+            ctx.clip('evenodd');
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(bx, by, bw, bh);
+
+            ctx.strokeStyle = '#E4002B';
+            ctx.lineWidth = 10;
+            for (let i = -bh; i < bw + bh; i += 22) {
+                ctx.beginPath();
+                ctx.moveTo(bx + i, by);
+                ctx.lineTo(bx + i - bh, by + bh);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(bx + borderW, by + borderW, bw - borderW * 2, bh - borderW * 2);
+
+            const drawCylinderCell = (cx, cy, cw, ch) => {
+                ctx.lineWidth = 3;
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(cx, cy, cw, ch);
+                ctx.fillRect(cx + cw * 0.25, cy - 6, cw * 0.5, 6);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(cx + 3, cy + 3, cw - 6, 6);
+            };
+            drawCylinderCell(222, 68, 34, 64);
+            drawCylinderCell(266, 68, 34, 64);
+            drawCylinderCell(310, 68, 34, 64);
+            drawCylinderCell(215, 145, 42, 85);
+
+            ctx.save();
+            ctx.translate(285, 195);
+            ctx.rotate(-0.32);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(-18, -35, 36, 65);
+            ctx.fillRect(-9, -41, 18, 6);
+            ctx.restore();
+
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.moveTo(295, 228);
+            ctx.lineTo(368, 228);
+            ctx.lineTo(352, 204);
+            ctx.lineTo(378, 186);
+            ctx.lineTo(348, 182);
+            ctx.lineTo(366, 152);
+            ctx.lineTo(335, 168);
+            ctx.lineTo(338, 134);
+            ctx.lineTo(314, 164);
+            ctx.lineTo(298, 145);
+            ctx.lineTo(302, 178);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 48px Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('UN 3091', bx + bw / 2, 295);
+
+            return canvas.toDataURL('image/png');
+        }
+
+        // =========================================================================
+        // 3. NAVIGATION & UI HELPERS
+        // =========================================================================
+        function switchTab(tab) {
+            const tabs = ['workspace', 'mapping', 'shipmark'];
+            tabs.forEach(t => {
+                const view = document.getElementById(`view-${t}`);
+                const btn = document.getElementById(`tab-${t}`);
+                if (t === tab) {
+                    view.classList.remove('hidden');
+                    btn.className = 'px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all bg-blue-600 text-white shadow flex items-center gap-1.5';
+                } else {
+                    view.classList.add('hidden');
+                    btn.className = 'px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all text-slate-300 hover:text-white flex items-center gap-1.5';
+                }
+            });
+        }
+
+        function colIdxToLetter(idx) {
+            let letter = '';
+            let temp = idx + 1;
+            while (temp > 0) {
+                let rem = (temp - 1) % 26;
+                letter = String.fromCharCode(65 + rem) + letter;
+                temp = Math.floor((temp - 1) / 26);
+            }
+            return letter;
+        }
+
+        function colLetterToIdx(letter) {
+            if (!letter || letter === 'blank') return -1;
+            const clean = String(letter).trim().toUpperCase();
+            let idx = 0;
+            for (let i = 0; i < clean.length; i++) {
+                idx = idx * 26 + (clean.charCodeAt(i) - 64);
+            }
+            return idx - 1;
+        }
+
+        function formatExcelDate(val) {
+            if (val === null || val === undefined || val === '') return '';
+            if (typeof val === 'number' && val > 20000 && val < 90000) {
+                const utcDays = Math.floor(val - 25569);
+                const d = new Date(utcDays * 86400 * 1000);
+                if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+            }
+            if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString().split('T')[0];
+            return String(val).trim();
+        }
+
+        // =========================================================================
+        // 4. EXCEL IMPORT & DATA PROCESSING
+        // =========================================================================
+        function handleOrderExcelUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            rawSourceFileName = file.name;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    rawSourceWorkbook = XLSX.read(data, { type: 'array', cellDates: true });
+
+                    buildDescriptionDictionary(rawSourceWorkbook);
+                    scanAndAutoMapSheets(rawSourceWorkbook);
+                    extractAndProcessAllData();
+                    updateMfrSuggestionsDatalist();
+
+                    document.getElementById('file-status-bar').classList.remove('hidden');
+                    document.getElementById('status-filename').textContent = rawSourceFileName;
+                    document.getElementById('status-desc-count').textContent = Object.keys(descriptionLookupDict).length;
+
+                    showToast('Import & Auto-Map Complete', `Loaded "${rawSourceFileName}". Found ${globalCargoVolumeRows.length} rows for ${document.getElementById('menu-c3').value}.`, 'success');
+                } catch (err) {
+                    console.error(err);
+                    alert('Error reading Excel file: ' + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function updateMfrSuggestionsDatalist() {
+            const datalist = document.getElementById('mfr-suggestions');
+            const uniqueMfrs = [...new Set(globalTempShipmarkRows.map(r => r.colE).filter(Boolean))];
+            datalist.innerHTML = uniqueMfrs.map(m => `<option value="${escapeHtml(m)}">`).join('');
+        }
+
+        function buildDescriptionDictionary(wb) {
+            descriptionLookupDict = {};
+            if (!wb.SheetNames.includes('Description')) return;
+            const wsDesc = wb.Sheets['Description'];
+            const aoa = XLSX.utils.sheet_to_json(wsDesc, { header: 1, defval: '' });
+            for (let r = 1; r < aoa.length; r++) {
+                const row = aoa[r];
+                if (!row || row.length === 0) continue;
+                const keyDesc = String(row[0] !== undefined ? row[0] : '').trim();
+                const catVal = String(row[3] !== undefined ? row[3] : '').trim();
+                if (keyDesc !== '' && !(keyDesc in descriptionLookupDict)) {
+                    descriptionLookupDict[keyDesc] = catVal;
+                }
+            }
+        }
+
+        function scanAndAutoMapSheets(wb) {
+            sheetHeadersMap = {};
+            sheetMappingConfig = {};
+            wb.SheetNames.forEach(sName => {
+                if (EXCLUDED_SHEETS.includes(sName)) return;
+                const ws = wb.Sheets[sName];
+                const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                if (!aoa || aoa.length === 0) return;
+                let headerRowIdx = 2;
+                for (let r = 0; r < Math.min(aoa.length, 6); r++) {
+                    if (aoa[r] && String(aoa[r][0] || '').trim().toLowerCase() === 'order') {
+                        headerRowIdx = r;
+                        break;
+                    }
+                }
+                const headerRow = aoa[headerRowIdx] || [];
+                const colMap = {};
+                headerRow.forEach((hVal, cIdx) => {
+                    const cleanHeader = String(hVal || '').replace(/\r?\n/g, ' ').trim();
+                    if (cleanHeader) colMap[colIdxToLetter(cIdx)] = cleanHeader;
+                });
+                sheetHeadersMap[sName] = colMap;
+                sheetMappingConfig[sName] = autoDetectSheetColumns(colMap, sName);
+            });
+            document.getElementById('status-sheets').textContent = Object.keys(sheetMappingConfig).length;
+            document.getElementById('badge-sheet-count').textContent = Object.keys(sheetMappingConfig).length;
+            renderMappingMatrixTable();
+        }
+
+        function autoDetectSheetColumns(colMap, sName) {
+            const config = { order: 'A', asstNo: '', desc: '', qty: '', pack: '', vendor: '', co: '', obsDate: '', qciDate: '', bnaCO: '', bnaPO: '', bntcaPO: '' };
+            const entries = Object.entries(colMap);
+            MAPPING_FIELDS.forEach(field => {
+                for (const [colLetter, headerText] of entries) {
+                    const hLower = headerText.toLowerCase().trim();
+                    if (field.matchKeywords.some(kw => hLower === kw || hLower.startsWith(kw))) {
+                        if (!config[field.key]) config[field.key] = colLetter;
+                    }
+                }
+            });
+            if (!config.asstNo && R5_STATIC_PRESET[sName]) return { ...R5_STATIC_PRESET[sName] };
+            return config;
+        }
+
+        function applyAutoHeaderMappingAll() {
+            if (!rawSourceWorkbook) return showToast('No File', 'Please upload an Excel file first.', 'warning');
+            Object.keys(sheetHeadersMap).forEach(sName => {
+                sheetMappingConfig[sName] = autoDetectSheetColumns(sheetHeadersMap[sName], sName);
+            });
+            document.getElementById('current-mapping-mode-badge').textContent = 'Auto Smart Header';
+            renderMappingMatrixTable();
+            extractAndProcessAllData();
+            showToast('Smart Auto-Mapping Applied', 'All sheets mapped automatically.', 'success');
+        }
+
+        function applyLegacyR5MappingPreset() {
+            if (!rawSourceWorkbook) return showToast('No File', 'Please upload an Excel file first.', 'warning');
+            Object.keys(sheetHeadersMap).forEach(sName => {
+                if (R5_STATIC_PRESET[sName]) sheetMappingConfig[sName] = { ...R5_STATIC_PRESET[sName] };
+            });
+            document.getElementById('current-mapping-mode-badge').textContent = 'R5 Static Preset';
+            renderMappingMatrixTable();
+            extractAndProcessAllData();
+            showToast('R5 Preset Loaded', 'Applied static column letters.', 'info');
+        }
+
+        function renderMappingMatrixTable() {
+            const sheetNames = Object.keys(sheetMappingConfig);
+            const theadRow = document.getElementById('mapping-thead-row');
+            const tbody = document.getElementById('mapping-tbody');
+            if (sheetNames.length === 0) return;
+
+            theadRow.innerHTML = `
+                <th class="py-2.5 px-3 border-r border-slate-700 sticky left-0 bg-slate-800 z-10">Target Field</th>
+                <th class="py-2.5 px-2.5 border-r border-slate-700 text-center">CV Col</th>
+                <th class="py-2.5 px-2.5 border-r border-slate-700 text-center">Vendor File Col</th>
+                ${sheetNames.map(s => `<th class="py-2.5 px-3 border-r border-slate-700 text-center min-w-[135px]">${escapeHtml(s)}</th>`).join('')}
+            `;
+
+            tbody.innerHTML = MAPPING_FIELDS.map(field => {
+                const cellsHtml = sheetNames.map(sName => {
+                    const currentLetter = (sheetMappingConfig[sName] && sheetMappingConfig[sName][field.key]) || '';
+                    const headersObj = sheetHeadersMap[sName] || {};
+                    let optionsHtml = `<option value="" ${currentLetter === '' ? 'selected' : ''}>-- blank --</option>`;
+                    Object.keys(headersObj).forEach(colL => {
+                        optionsHtml += `<option value="${colL}" ${colL === currentLetter ? 'selected' : ''}>${colL}: ${escapeHtml(headersObj[colL])}</option>`;
+                    });
+                    return `<td class="p-1.5 border-b border-r bg-white"><select onchange="updateSingleMappingCell('${escapeHtml(sName)}', '${field.key}', this.value)" class="w-full px-2 py-1 text-xs rounded border border-slate-300">${optionsHtml}</select></td>`;
+                }).join('');
+                return `<tr class="hover:bg-slate-50"><td class="py-2 px-3 border-b border-r font-semibold text-slate-700 sticky left-0 bg-white z-10">${escapeHtml(field.label)}</td><td class="py-2 px-2.5 border-b border-r text-center font-bold text-blue-600 bg-slate-50">${field.cvCol}</td><td class="py-2 px-2.5 border-b border-r text-center font-bold text-purple-600 bg-slate-50">${field.tsCol}</td>${cellsHtml}</tr>`;
+            }).join('');
+        }
+
+        function updateSingleMappingCell(sName, fieldKey, val) {
+            if (sheetMappingConfig[sName]) sheetMappingConfig[sName][fieldKey] = val;
+        }
+
+        function reprocessDataWithCurrentMapping() {
+            if (!rawSourceWorkbook) return;
+            extractAndProcessAllData();
+            showToast('Mapping Updated', 'Refreshed data with custom mapping.', 'success');
+        }
+
+        function onMonthFilterChange() {
+            document.getElementById('stat-month').textContent = document.getElementById('menu-c3').value;
+            if (rawSourceWorkbook) extractAndProcessAllData();
+        }
+
+        function extractAndProcessAllData() {
+            if (!rawSourceWorkbook) return;
+            const filterVal = document.getElementById('menu-c3').value.trim().toLowerCase();
+            globalCargoVolumeRows = [];
+            globalTempShipmarkRows = [];
+
+            rawSourceWorkbook.SheetNames.forEach(sName => {
+                if (EXCLUDED_SHEETS.includes(sName)) return;
+                const mapCfg = sheetMappingConfig[sName];
+                if (!mapCfg || !mapCfg.order) return;
+                const ws = rawSourceWorkbook.Sheets[sName];
+                const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+                if (!aoa || aoa.length < 4) return;
+
+                for (let rIdx = 3; rIdx < aoa.length; rIdx++) {
+                    const row = aoa[rIdx];
+                    if (!row || row.length === 0) continue;
+                    const cellOrderVal = String(row[colLetterToIdx(mapCfg.order)] || '').trim();
+                    if (cellOrderVal.toLowerCase() === filterVal) {
+                        const getVal = (colL) => {
+                            const cIdx = colLetterToIdx(colL);
+                            return (cIdx >= 0 && row[cIdx] !== undefined) ? row[cIdx] : '';
+                        };
+
+                        const rawAsstNo = String(getVal(mapCfg.asstNo)).trim();
+                        const rawDesc = String(getVal(mapCfg.desc)).trim();
+                        const rawQty = getVal(mapCfg.qty);
+                        const rawPack = getVal(mapCfg.pack);
+                        const rawVendor = String(getVal(mapCfg.vendor)).trim();
+                        const rawCO = String(getVal(mapCfg.co)).trim();
+
+                        const cvRow = {
+                            rowNum: globalCargoVolumeRows.length + 2,
+                            colA: cellOrderVal.toUpperCase(), colB: rawAsstNo, colC: rawDesc,
+                            colD: rawQty !== '' && !isNaN(Number(rawQty)) ? Number(rawQty) : rawQty,
+                            colE: '', colF: '', colG: '', colH: '',
+                            colI: formatPackRatioValue(rawPack), colJ: '', colK: '',
+                            colL: rawVendor, colM: rawCO,
+                            colN: formatExcelDate(getVal(mapCfg.obsDate)),
+                            colO: formatExcelDate(getVal(mapCfg.qciDate)),
+                            colP: String(getVal(mapCfg.bnaCO)).trim(),
+                            colQ: String(getVal(mapCfg.bnaPO)).trim(),
+                            colR: String(getVal(mapCfg.bntcaPO)).trim(),
+                            colS: '', colT: '', colU: sName
+                        };
+                        recalculateSingleCVRowFormulas(cvRow);
+                        globalCargoVolumeRows.push(cvRow);
+
+                        const lookupKey = rawAsstNo.length >= 5 ? rawAsstNo.substring(0, 5) : rawAsstNo;
+                        const categoryVal = descriptionLookupDict[lookupKey] !== undefined ? descriptionLookupDict[lookupKey] : '';
+                        let templateType = 'NORMAL';
+                        if (rawCO.toUpperCase() === 'VIETNAM') templateType = 'VIETNAM';
+                        else if (categoryVal.toUpperCase() === 'ELECTRONICS') templateType = 'OT';
+
+                        globalTempShipmarkRows.push({
+                            seqNo: globalTempShipmarkRows.length + 1,
+                            colB: cvRow.colQ, colC: 'BNTCA', colD: rawDesc, colE: rawAsstNo,
+                            colF: rawVendor, colG: rawCO, colH: formatPackRatioDisplay(rawPack),
+                            colI: categoryVal, colM: sName, templateType: templateType
+                        });
+                    }
+                }
+            });
+
+            buildVendorShipmarkPackages();
+            renderWorkspaceTables();
+            renderShipmarkCards();
+        }
+
+        function formatPackRatioDisplay(val) {
+            if (val === null || val === undefined || val === '') return '';
+            if (val instanceof Date) return `${val.getHours()}:${val.getMinutes()}`;
+            return String(val).trim();
+        }
+
+        function formatPackRatioValue(val) {
+            const str = formatPackRatioDisplay(val);
+            if (str.includes(':')) {
+                let sum = 0;
+                str.split(':').forEach(p => {
+                    const clean = p.replace(/AM|PM/gi, '').trim();
+                    if (clean !== '' && !isNaN(Number(clean))) sum += Number(clean);
+                });
+                return sum > 0 ? sum : str;
+            }
+            return str !== '' && !isNaN(Number(str)) ? Number(str) : str;
+        }
+
+        function recalculateSingleCVRowFormulas(cvRow) {
+            if (typeof cvRow.colI === 'string' && cvRow.colI.includes(':')) cvRow.colI = formatPackRatioValue(cvRow.colI);
+            const qty = parseFloat(cvRow.colD), pack = parseFloat(cvRow.colI), L = parseFloat(cvRow.colF), W = parseFloat(cvRow.colG), H = parseFloat(cvRow.colH);
+            if (!isNaN(L) && !isNaN(W) && !isNaN(H) && L > 0 && W > 0 && H > 0) {
+                cvRow.colJ = Number(((L * W * H) / 1728 / 35.32).toFixed(6));
+            }
+            if (!isNaN(pack) && Number.isInteger(pack) && pack !== 0 && !isNaN(qty)) {
+                cvRow.colE = Number((qty / pack).toFixed(2));
+                if (cvRow.colJ !== '') cvRow.colK = Number(((qty / pack) * cvRow.colJ).toFixed(4));
+            }
+        }
+
+        // Live Edit Handler from Tab 1 Table Input Fields
+        function updateCargoVolumeCell(idx, field, val) {
+            if (!globalCargoVolumeRows[idx]) return;
+            globalCargoVolumeRows[idx][field] = val;
+            recalculateSingleCVRowFormulas(globalCargoVolumeRows[idx]);
+
+            const cvItem = globalCargoVolumeRows[idx];
+            const matchingTemp = globalTempShipmarkRows.find(t => t.colE === cvItem.colB && t.colB === cvItem.colQ);
+            if (matchingTemp) {
+                if (field === 'colC') matchingTemp.colD = val;
+                if (field === 'colI') matchingTemp.colH = formatPackRatioDisplay(val);
+                if (field === 'colL') matchingTemp.colF = val;
+                if (field === 'colM') matchingTemp.colG = val;
+                if (field === 'colQ') matchingTemp.colB = val;
+            }
+
+            buildVendorShipmarkPackages();
+            renderWorkspaceTables(true);
+        }
+
+        function buildVendorShipmarkPackages() {
+            generatedVendorPackages = [];
+            const dateStr = (document.getElementById('export-date-str').value || 'OCTOBER 23').trim().toUpperCase();
+            const vendorList = [];
+            globalTempShipmarkRows.forEach(r => {
+                const v = String(r.colF || '').trim();
+                if (v !== '' && !vendorList.includes(v)) vendorList.push(v);
+            });
+
+            let vietCount = 0, otCount = 0, normCount = 0;
+            vendorList.forEach(vendorKey => {
+                const vRows = globalTempShipmarkRows.filter(r => String(r.colF || '').trim() === vendorKey);
+                const vietRows = [], otRows = [], normRows = [];
+                vRows.forEach(r => {
+                    if (String(r.colG || '').trim().toUpperCase() === 'VIETNAM') { vietRows.push(r); vietCount++; }
+                    else if (String(r.colI || '').trim().toUpperCase() === 'ELECTRONICS') { otRows.push(r); otCount++; }
+                    else { normRows.push(r); normCount++; }
+                });
+
+                if (vietRows.length > 0) {
+                    generatedVendorPackages.push({ fileName: `BAI_SHIPMARK ORDER(${dateStr}) - ${vendorKey}(VIETNAM).xlsx`, vendor: vendorKey, type: 'VIETNAM', sheetName: 'shipmarktempViet', rows: vietRows });
+                }
+                if (normRows.length > 0) {
+                    generatedVendorPackages.push({ fileName: `BAI_SHIPMARK ORDER(${dateStr}) - ${vendorKey}.xlsx`, vendor: vendorKey, type: 'NORMAL', sheetName: 'shipmarktemp', rows: normRows });
+                }
+                if (otRows.length > 0) {
+                    generatedVendorPackages.push({ fileName: `BAI_SHIPMARK ORDER (MAY 15) - ${vendorKey} (OT).xlsx`.replace('MAY 15', dateStr), vendor: vendorKey, type: 'OT', sheetName: 'shipmarktempOT', rows: otRows });
+                }
+            });
+
+            // Sort packages by priority: VIETNAM (1) -> OT (2) -> NORMAL (3)
+            const typePriority = { 'VIETNAM': 1, 'OT': 2, 'NORMAL': 3 };
+            generatedVendorPackages.sort((a, b) => (typePriority[a.type] || 3) - (typePriority[b.type] || 3));
+
+            document.getElementById('stat-cv-rows').textContent = globalCargoVolumeRows.length;
+            document.getElementById('stat-vendors').textContent = vendorList.length;
+            document.getElementById('stat-split-counts').textContent = `${vietCount} / ${otCount} / ${normCount}`;
+            document.getElementById('stat-total-files').textContent = generatedVendorPackages.length;
+            document.getElementById('badge-cv-count').textContent = globalCargoVolumeRows.length;
+            document.getElementById('badge-file-count').textContent = generatedVendorPackages.length;
+        }
+
+        // =========================================================================
+        // 5. EXACT 1:1 EXCELJS GENERATOR (AUTO-FIT, COL A WIDTH 2, RIGHT-SIDE IMAGE)
+        // =========================================================================
+        async function generateExactVendorExcelBuffer(pkg) {
+            ensureEmbeddedGraphicsReady();
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'Shipping & Shipmark System R5';
+            workbook.created = new Date();
+
+            const ws = workbook.addWorksheet(pkg.sheetName, { views: [{ showGridLines: true }] });
+
+            const thinBorder = {
+                top: { style: 'thin', color: { argb: 'FF000000' } },
+                left: { style: 'thin', color: { argb: 'FF000000' } },
+                bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                right: { style: 'thin', color: { argb: 'FF000000' } }
+            };
+
+            // Header Row 1: Columns A to L
+            const headerVals = ['', 'PO No.', 'Customer', 'Description', 'MFR#', 'VENDOR', 'Country', 'Pack', 'Category', 'L', 'W', 'H'];
+            const hRow = ws.getRow(1);
+            hRow.height = 19;
+            for (let c = 1; c <= headerVals.length; c++) {
+                const cell = hRow.getCell(c);
+                cell.value = headerVals[c - 1];
+                cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF000000' } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                cell.border = thinBorder;
+            }
+
+            // Data Rows (Starting Row 2, Columns A to L)
+            pkg.rows.forEach((r, idx) => {
+                const rNum = idx + 2;
+                const row = ws.getRow(rNum);
+                row.height = 18;
+
+                const po = r.colB !== '' && !isNaN(Number(r.colB)) ? Number(r.colB) : String(r.colB || '');
+                const mfr = r.colE !== '' && !isNaN(Number(r.colE)) ? Number(r.colE) : String(r.colE || '');
+
+                const rowVals = [
+                    idx + 1,                    // A: Seq No
+                    po,                         // B: PO No.
+                    r.colC || 'BNTCA',          // C: Customer
+                    r.colD || '',               // D: Description
+                    mfr,                        // E: MFR#
+                    r.colF || '',               // F: VENDOR
+                    r.colG || '',               // G: Country
+                    r.colH !== '' && !isNaN(Number(r.colH)) ? Number(r.colH) : (r.colH || ''), // H: Pack
+                    r.colI || ''                // I: Category
+                ];
+
+                for (let c = 1; c <= 12; c++) {
+                    const cell = row.getCell(c);
+                    cell.value = rowVals[c - 1] !== undefined ? rowVals[c - 1] : '';
+                    cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF000000' } };
+                    cell.border = thinBorder;
+                    if (c === 1) {
+                        cell.alignment = { vertical: 'middle', horizontal: 'right' };
+                    } else if (c === 2 || c === 3 || c === 5 || c === 6 || c === 7 || c === 8 || c === 9) {
+                        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    } else {
+                        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+                    }
+                }
+            });
+
+            if (pkg.type === 'OT') {
+                const cellJ3 = ws.getRow(3).getCell(10);
+                cellJ3.value = '<<<';
+                cellJ3.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFF0000' } };
+                cellJ3.alignment = { vertical: 'middle', horizontal: 'left' };
+            }
+
+            const lastDataRow = pkg.rows.length + 1;
+            const baseRow = lastDataRow + 3;
+            const rOff = baseRow - 1;
+
+            if (pkg.type === 'VIETNAM') {
+                const rV = ws.getRow(rOff + 3);
+                rV.height = 20;
+                const cV = rV.getCell(4);
+                cV.value = '請用英文 REMARKS';
+                cV.font = { name: 'PMingLiU', size: 12, bold: true, color: { argb: 'FFFF0000' } };
+                cV.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2DCDB' } };
+            }
+
+            const rU = ws.getRow(rOff + 4);
+            rU.height = 20;
+            const cU = rU.getCell(4);
+            cU.value = '請更新 REMARKS';
+            cU.font = { name: 'PMingLiU', size: 12, bold: true, color: { argb: 'FFFF0000' } };
+            cU.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2DCDB' } };
+
+            const rL = ws.getRow(rOff + 10);
+            rL.height = 19;
+            const cL = rL.getCell(4);
+            cL.value = 'Please use new logo for ship mark';
+            cL.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFF0000' } };
+            cL.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+
+            ws.getRow(rOff + 11).height = 22;
+            ws.getRow(rOff + 12).height = 18;
+            ws.getRow(rOff + 13).height = 18;
+            ws.getRow(rOff + 14).height = 18;
+
+            const cBT = ws.getRow(rOff + 11).getCell(4);
+            cBT.value = 'BANDAI NAMCO';
+            cBT.font = { name: 'Calibri', size: 15, bold: true, color: { argb: 'FF7030A0' } };
+
+            const cBS = ws.getRow(rOff + 12).getCell(4);
+            cBS.value = 'Bandai Namco Toys Collectible America Inc.';
+            cBS.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF7030A0' } };
+
+            for (let rr = rOff + 11; rr <= rOff + 14; rr++) {
+                for (let cc = 4; cc <= 5; cc++) {
+                    const bCell = ws.getRow(rr).getCell(cc);
+                    const bdr = {};
+                    if (rr === rOff + 11) bdr.top = { style: 'double', color: { argb: 'FF000000' } };
+                    if (rr === rOff + 14) bdr.bottom = { style: 'double', color: { argb: 'FF000000' } };
+                    if (cc === 4) bdr.left = { style: 'double', color: { argb: 'FF000000' } };
+                    if (cc === 5) bdr.right = { style: 'double', color: { argb: 'FF000000' } };
+                    bCell.border = bdr;
+                }
+            }
+
+            if (pkg.type === 'OT') {
+                const rDA = ws.getRow(rOff + 16);
+                rDA.height = 19;
+                ws.mergeCells(rOff + 16, 2, rOff + 16, 3);
+                const cDA = rDA.getCell(2);
+                cDA.value = '請刪除及新增以下句子:';
+                cDA.font = { name: 'PMingLiU', size: 11, bold: true, color: { argb: 'FFFF0000' } };
+                cDA.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00FFFF' } };
+
+                const rUN = ws.getRow(rOff + 18);
+                rUN.height = 20;
+                ws.mergeCells(rOff + 18, 2, rOff + 18, 5);
+                const cUN = rUN.getCell(2);
+                cUN.value = 'Add UN 3091 Battery Label (COS23026) 10 x 10 CM on Main Mark Top Right Hand Corner (1 Side Only)';
+                cUN.font = { name: 'Calibri', size: 11, bold: true, strike: true, color: { argb: 'FF002060' } };
+                cUN.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+
+                const specs = [
+                    '鋰電池標誌必須為矩形或正方形，最小尺寸為100 毫米×100 毫米。',
+                    '標記的邊框必須有紅色對角陰影線(Pantone 186C)，最小寬度為5 毫米。',
+                    '如果包裝尺寸有要求，尺寸可縮小至不小於100 毫米寬x 70 毫米高，',
+                    '並且在所有各方面要求上必須與全尺寸標記上顯示的要求大致成比例。',
+                    '標記上標註的UN 編號高度應至少為12 毫米。'
+                ];
+                specs.forEach((sText, idx) => {
+                    const rr = ws.getRow(rOff + 20 + idx);
+                    rr.height = 19;
+                    const cS = rr.getCell(2);
+                    cS.value = sText;
+                    cS.font = { name: 'PMingLiU', size: 11, bold: true };
+                });
+
+                // Embed UN 3091 Graphic Image on the right side starting at Column M (col: 12.0) top row 1 (row: 0.2)
+                const targetImageBase64 = userUploadedShipmarkImageBase64 || cachedUN3091ImageBase64;
+                const pureTargetBase64 = getPureBase64(targetImageBase64);
+                const unImgId = workbook.addImage({ base64: pureTargetBase64, extension: 'png' });
+                ws.addImage(unImgId, { tl: { col: 12.0, row: 0.2 }, ext: { width: 380, height: 310 } });
+            }
+
+            // AUTO-FIT COLUMN WIDTHS (Col A fixed to width 2, others auto-fit)
+            ws.columns.forEach((column, colIdx) => {
+                if (colIdx === 0) {
+                    column.width = 2; // Column A width set to 2
+                    return;
+                }
+                let maxLen = 10;
+                column.eachCell({ includeEmpty: false }, cell => {
+                    if (cell.row > lastDataRow + 5) return;
+                    const valStr = String(cell.value || '');
+                    if (valStr.length > maxLen) {
+                        maxLen = valStr.length;
+                    }
+                });
+                column.width = Math.min(Math.max(maxLen + 3, 10), 55);
+            });
+
+            return await workbook.xlsx.writeBuffer();
+        }
+
+        // =========================================================================
+        // 6. TABLE RENDERING, LIVE EDITING & EXPORTS
+        // =========================================================================
+        function renderWorkspaceTables(preserveFocus = false) {
+            const searchKw = (document.getElementById('table-search').value || '').trim().toLowerCase();
+            const filteredCV = globalCargoVolumeRows.filter(r => {
+                if (!searchKw) return true;
+                return [r.colB, r.colC, r.colL, r.colM, r.colP, r.colQ, r.colU].some(v => String(v || '').toLowerCase().includes(searchKw));
+            });
+
+            document.getElementById('cv-row-count').textContent = `${filteredCV.length} rows shown (Total: ${globalCargoVolumeRows.length})`;
+            const cvTbody = document.getElementById('cv-tbody');
+            if (filteredCV.length === 0) {
+                cvTbody.innerHTML = `<tr><td colspan="22" class="py-10 text-center text-slate-400">No matching records found for month "${document.getElementById('menu-c3').value}".</td></tr>`;
+            } else {
+                cvTbody.innerHTML = filteredCV.map((i) => {
+                    const realIdx = globalCargoVolumeRows.findIndex(row => row.rowNum === i.rowNum);
+                    return `
+                        <tr class="hover:bg-blue-50/40 transition-colors">
+                            <td class="py-2 px-3 border-b border-r text-center text-slate-400">${i.rowNum - 1}</td>
+                            <td class="py-2 px-3 border-b border-r font-bold text-blue-600">${escapeHtml(i.colA)}</td>
+                            <td class="py-2 px-3 border-b border-r font-semibold text-slate-800">${escapeHtml(i.colB)}</td>
+                            <td class="py-2 px-3 border-b border-r">
+                                <input type="text" value="${escapeHtml(i.colC)}" oninput="updateCargoVolumeCell(${realIdx}, 'colC', this.value)" class="w-72 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r text-right">
+                                <input type="number" value="${escapeHtml(i.colD)}" oninput="updateCargoVolumeCell(${realIdx}, 'colD', this.value)" class="w-20 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r text-right text-emerald-700 font-semibold mono-font">${escapeHtml(i.colE)}</td>
+                            <td class="py-2 px-3 border-b border-r text-right">
+                                <input type="number" step="0.01" value="${escapeHtml(i.colF)}" oninput="updateCargoVolumeCell(${realIdx}, 'colF', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r text-right">
+                                <input type="number" step="0.01" value="${escapeHtml(i.colG)}" oninput="updateCargoVolumeCell(${realIdx}, 'colG', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r text-right">
+                                <input type="number" step="0.01" value="${escapeHtml(i.colH)}" oninput="updateCargoVolumeCell(${realIdx}, 'colH', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r text-center">
+                                <input type="text" value="${escapeHtml(i.colI)}" oninput="updateCargoVolumeCell(${realIdx}, 'colI', this.value)" class="w-20 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r text-right mono-font">${escapeHtml(i.colJ)}</td>
+                            <td class="py-2 px-3 border-b border-r text-right font-semibold text-indigo-600 mono-font">${escapeHtml(i.colK)}</td>
+                            <td class="py-2 px-3 border-b border-r font-bold text-slate-800">
+                                <input type="text" value="${escapeHtml(i.colL)}" oninput="updateCargoVolumeCell(${realIdx}, 'colL', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r">
+                                <input type="text" value="${escapeHtml(i.colM)}" oninput="updateCargoVolumeCell(${realIdx}, 'colM', this.value)" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r"><input type="date" value="${escapeHtml(i.colN)}" oninput="updateCargoVolumeCell(${realIdx}, 'colN', this.value)" class="px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
+                            <td class="py-2 px-3 border-b border-r"><input type="date" value="${escapeHtml(i.colO)}" oninput="updateCargoVolumeCell(${realIdx}, 'colO', this.value)" class="px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
+                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colP)}" oninput="updateCargoVolumeCell(${realIdx}, 'colP', this.value)" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
+                            <td class="py-2 px-3 border-b border-r font-semibold text-blue-700">
+                                <input type="text" value="${escapeHtml(i.colQ)}" oninput="updateCargoVolumeCell(${realIdx}, 'colQ', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colR)}" oninput="updateCargoVolumeCell(${realIdx}, 'colR', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
+                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colS)}" oninput="updateCargoVolumeCell(${realIdx}, 'colS', this.value)" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
+                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colT)}" oninput="updateCargoVolumeCell(${realIdx}, 'colT', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
+                            <td class="py-2 px-3 border-b text-slate-500 font-semibold">${escapeHtml(i.colU)}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // =========================================================================
+        // 7. 3-COLUMN GROUPED SHIPMARK CARDS RENDERER
+        // =========================================================================
+        function renderShipmarkCards() {
+            const grid = document.getElementById('shipmark-files-grid');
+            if (generatedVendorPackages.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-12 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">No Vendor Shipmark files generated for this month.</div>`;
+                return;
+            }
+
+            const vietPkgs = generatedVendorPackages.filter(p => p.type === 'VIETNAM');
+            const otPkgs = generatedVendorPackages.filter(p => p.type === 'OT');
+            const normPkgs = generatedVendorPackages.filter(p => p.type === 'NORMAL');
+
+            const renderColumnCards = (pkgs) => {
+                if (pkgs.length === 0) {
+                    return `<div class="py-8 text-center text-slate-400 text-xs italic bg-slate-50/50 rounded-lg border border-dashed border-slate-200">No files in this category</div>`;
+                }
+                return pkgs.map((pkg) => {
+                    const idx = generatedVendorPackages.indexOf(pkg);
+                    const badgeStyle = pkg.type === 'VIETNAM' ? 'bg-rose-600 text-white' : pkg.type === 'OT' ? 'bg-amber-500 text-white' : 'bg-emerald-600 text-white';
+                    const cardBorder = pkg.type === 'VIETNAM' ? 'border-rose-300 hover:border-rose-500' : pkg.type === 'OT' ? 'border-amber-300 hover:border-amber-500' : 'border-slate-200 hover:border-blue-400';
+
+                    return `
+                        <div class="bg-white rounded-xl border ${cardBorder} p-4 shadow-sm transition flex flex-col justify-between space-y-3 mb-4">
+                            <div class="space-y-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-[10px] font-bold px-2.5 py-0.5 rounded uppercase ${badgeStyle}">
+                                        ${pkg.type === 'VIETNAM' ? 'Vietnam Format' : pkg.type === 'OT' ? 'OT Format (Right-Side Image)' : 'Normal Format'}
+                                    </span>
+                                    <span class="text-xs font-bold text-slate-500 mono-font">${pkg.rows.length} items</span>
+                                </div>
+                                <h4 class="font-bold text-slate-800 text-sm mono-font break-all">${escapeHtml(pkg.fileName)}</h4>
+                                <div class="text-[11px] text-slate-500 flex flex-wrap gap-x-4 gap-y-1">
+                                    <span><i class="fa-solid fa-industry mr-1 text-slate-400"></i>Vendor: <strong class="text-slate-700">${escapeHtml(pkg.vendor)}</strong></span>
+                                    <span><i class="fa-solid fa-image mr-1 text-emerald-500"></i>Auto-Fit &amp; Right-Side Image</span>
+                                </div>
+                            </div>
+
+                            <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                                <button onclick="openShipmarkPreviewModal(${idx})" class="text-xs font-semibold text-slate-600 hover:text-blue-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 transition flex items-center gap-1">
+                                    <i class="fa-solid fa-eye"></i> 1:1 Visual Preview
+                                </button>
+                                <button onclick="downloadSingleVendorExcel(${idx})" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-1.5 rounded-lg shadow-xs transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-download"></i> Download .xlsx
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            };
+
+            grid.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Left Column: Vietnam (Red) -->
+                    <div class="space-y-4">
+                        <div class="bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold px-3 py-2.5 rounded-lg flex items-center justify-between shadow-xs">
+                            <span><i class="fa-solid fa-flag mr-1.5"></i> Vietnam Cards (Red)</span>
+                            <span class="bg-rose-600 text-white px-2 py-0.5 rounded-full text-[10px] mono-font">${vietPkgs.length}</span>
+                        </div>
+                        ${renderColumnCards(vietPkgs)}
+                    </div>
+
+                    <!-- Middle Column: Electronics OT (Amber/Orange) -->
+                    <div class="space-y-4">
+                        <div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold px-3 py-2.5 rounded-lg flex items-center justify-between shadow-xs">
+                            <span><i class="fa-solid fa-bolt mr-1.5"></i> OT Format Cards (Amber)</span>
+                            <span class="bg-amber-600 text-white px-2 py-0.5 rounded-full text-[10px] mono-font">${otPkgs.length}</span>
+                        </div>
+                        ${renderColumnCards(otPkgs)}
+                    </div>
+
+                    <!-- Right Column: Standard Normal (Green) -->
+                    <div class="space-y-4">
+                        <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold px-3 py-2.5 rounded-lg flex items-center justify-between shadow-xs">
+                            <span><i class="fa-solid fa-box mr-1.5"></i> Normal Cards (Green)</span>
+                            <span class="bg-emerald-600 text-white px-2 py-0.5 rounded-full text-[10px] mono-font">${normPkgs.length}</span>
+                        </div>
+                        ${renderColumnCards(normPkgs)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function createCargoVolumeWorkbook() {
+            const aoa = [
+                ["Order", "Asst No.", "Description", "Qty", "Ctn", "L", "W", "H", "Pack", "CBM", "Total CBM", "Vendor", "C/O", "OBS Date", "QCI Date", "BNA C/O#", "BNA P/O#", "BNTCA PO#", "Acumatica", "Notes", "Sheet"]
+            ];
+            globalCargoVolumeRows.forEach(i => {
+                aoa.push([
+                    i.colA, i.colB, i.colC, i.colD, i.colE, i.colF, i.colG, i.colH, i.colI,
+                    i.colJ, i.colK, i.colL, i.colM, i.colN, i.colO, i.colP, i.colQ, i.colR, i.colS, i.colT, i.colU
+                ]);
+            });
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Cargo Volume');
+            return wb;
+        }
+
+        function exportCargoVolumeExcel() {
+            if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload an Order Excel file first.', 'warning');
+            const wb = createCargoVolumeWorkbook();
+            const monthStr = document.getElementById('menu-c3').value;
+            XLSX.writeFile(wb, `Cargo_Volume_${monthStr}_2026.xlsx`);
+            showToast('Cargo Volume Exported', `Downloaded Cargo_Volume_${monthStr}_2026.xlsx`, 'success');
+        }
+
+        async function downloadSingleVendorExcel(pkgIdx) {
+            const pkg = generatedVendorPackages[pkgIdx];
+            if (!pkg) return;
+            try {
+                const buffer = await generateExactVendorExcelBuffer(pkg);
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                triggerBlobDownload(blob, pkg.fileName);
+                showToast('Vendor File Downloaded', `Saved ${pkg.fileName} with auto-fit & right-side image.`, 'success');
+            } catch (err) {
+                console.error(err);
+                alert('Error generating Vendor Excel: ' + err.message);
+            }
+        }
+
+        async function downloadAllVendorFilesSequentially() {
+            if (generatedVendorPackages.length === 0) return showToast('No Files', 'No vendor shipmark files to download.', 'warning');
+            showToast('Batch Download Started', `Generating ${generatedVendorPackages.length} formatted Excel files...`, 'info');
+            for (let idx = 0; idx < generatedVendorPackages.length; idx++) {
+                const pkg = generatedVendorPackages[idx];
+                const buffer = await generateExactVendorExcelBuffer(pkg);
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                triggerBlobDownload(blob, pkg.fileName);
+                await new Promise(r => setTimeout(r, 260));
+            }
+            showToast('Batch Download Complete', `Downloaded all ${generatedVendorPackages.length} Vendor Excel files.`, 'success');
+        }
+
+        async function downloadAllVendorShipmarksZip() {
+            if (generatedVendorPackages.length === 0) return showToast('No Files', 'Please import an Order file first.', 'warning');
+            const zip = new JSZip();
+            const monthStr = document.getElementById('menu-c3').value;
+
+            for (const pkg of generatedVendorPackages) {
+                const buffer = await generateExactVendorExcelBuffer(pkg);
+                zip.file(pkg.fileName, buffer);
+            }
+
+            const content = await zip.generateAsync({ type: 'blob' });
+            triggerBlobDownload(content, `Vendor_Shipmarks_${monthStr}_2026.zip`);
+            showToast('ZIP Downloaded', `Packed ${generatedVendorPackages.length} formatted Vendor Shipmark files into ZIP.`, 'success');
+        }
+
+        async function downloadAllOutputsAsZip() {
+            if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload BNTCA Order 2026.xlsx first.', 'warning');
+            const zip = new JSZip();
+            const monthStr = document.getElementById('menu-c3').value;
+
+            const wbCV = createCargoVolumeWorkbook();
+            const cvOut = XLSX.write(wbCV, { bookType: 'xlsx', type: 'array' });
+            zip.file(`Cargo_Volume_${monthStr}_2026.xlsx`, cvOut);
+
+            const vendorFolder = zip.folder(`Vendor_Shipmarks_${monthStr}`);
+            for (const pkg of generatedVendorPackages) {
+                const buffer = await generateExactVendorExcelBuffer(pkg);
+                vendorFolder.file(pkg.fileName, buffer);
+            }
+
+            const content = await zip.generateAsync({ type: 'blob' });
+            triggerBlobDownload(content, `BNTCA_${monthStr}_CargoVolume_And_Shipmarks_FullPack.zip`);
+            showToast('Full Package Exported', `Downloaded Cargo Volume + ${generatedVendorPackages.length} formatted Vendor Shipmark Excels!`, 'success');
+        }
+
+        function triggerBlobDownload(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // =========================================================================
+        // 8. FULLY EDITABLE PREVIEW MODAL WITH MFR# AUTO-LOAD & ADD/DELETE ITEMS
+        // =========================================================================
+        let currentEditingPkgIdx = null;
+
+        function openShipmarkPreviewModal(pkgIdx) {
+            currentEditingPkgIdx = pkgIdx;
+            const pkg = generatedVendorPackages[pkgIdx];
+            if (!pkg) return;
+
+            ensureEmbeddedGraphicsReady();
+
+            document.getElementById('modal-preview-title').textContent = pkg.fileName;
+            const badge = document.getElementById('modal-preview-badge');
+            badge.textContent = pkg.type;
+            badge.className = pkg.type === 'VIETNAM'
+                ? 'bg-rose-600 text-white text-xs font-bold px-2.5 py-0.5 rounded'
+                : pkg.type === 'OT'
+                    ? 'bg-amber-500 text-white text-xs font-bold px-2.5 py-0.5 rounded'
+                    : 'bg-emerald-600 text-white text-xs font-bold px-2.5 py-0.5 rounded';
+
+            const dlBtn = document.getElementById('modal-download-btn');
+            dlBtn.onclick = () => downloadSingleVendorExcel(pkgIdx);
+
+            renderEditablePreviewTable();
+            const modal = document.getElementById('modal-shipmark-preview');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function renderEditablePreviewTable() {
+            const pkg = generatedVendorPackages[currentEditingPkgIdx];
+            if (!pkg) return;
+
+            const dataRowsHtml = pkg.rows.map((r, i) => `
+                <tr class="hover:bg-slate-50">
+                    <td class="border border-black px-2 py-1 text-center text-slate-500 bg-[#FAFAFA]">${i + 1}</td>
+                    <td class="border border-black px-1 py-1 text-center bg-[#FAFAFA]">
+                        <input type="text" value="${escapeHtml(r.colB)}" oninput="updatePreviewRow(${i}, 'colB', this.value)" class="w-28 px-1 py-0.5 border border-slate-300 rounded text-xs text-center bg-white">
+                    </td>
+                    <td class="border border-black px-1 py-1 text-center bg-[#FAFAFA]">
+                        <input type="text" value="${escapeHtml(r.colC || 'BNTCA')}" oninput="updatePreviewRow(${i}, 'colC', this.value)" class="w-20 px-1 py-0.5 border border-slate-300 rounded text-xs text-center bg-white">
+                    </td>
+                    <td class="border border-black px-1 py-1 text-left bg-[#FAFAFA]">
+                        <input type="text" value="${escapeHtml(r.colD)}" oninput="updatePreviewRow(${i}, 'colD', this.value)" class="w-80 px-1 py-0.5 border border-slate-300 rounded text-xs bg-white">
+                    </td>
+                    <td class="border border-black px-1 py-1 text-center bg-[#FAFAFA]">
+                        <input type="text" list="mfr-suggestions" value="${escapeHtml(r.colE)}" onchange="onPreviewMfrChange(${i}, this.value)" oninput="updatePreviewRow(${i}, 'colE', this.value)" class="w-28 px-1 py-0.5 border border-slate-300 rounded text-xs text-center font-bold text-blue-600 bg-white" placeholder="Type MFR#">
+                    </td>
+                    <td class="border border-black px-1 py-1 text-center bg-[#FAFAFA]">
+                        <input type="text" value="${escapeHtml(r.colF)}" oninput="updatePreviewRow(${i}, 'colF', this.value)" class="w-28 px-1 py-0.5 border border-slate-300 rounded text-xs text-center bg-white">
+                    </td>
+                    <td class="border border-black px-1 py-1 text-center bg-[#FAFAFA]">
+                        <input type="text" value="${escapeHtml(r.colG)}" oninput="updatePreviewRow(${i}, 'colG', this.value)" class="w-20 px-1 py-0.5 border border-slate-300 rounded text-xs text-center bg-white">
+                    </td>
+                    <td class="border border-black px-1 py-1 text-center bg-[#FAFAFA]">
+                        <input type="text" value="${escapeHtml(r.colH)}" oninput="updatePreviewRow(${i}, 'colH', this.value)" class="w-16 px-1 py-0.5 border border-slate-300 rounded text-xs text-center bg-white">
+                    </td>
+                    <td class="border border-black px-1 py-1 text-center bg-[#FAFAFA]">
+                        <input type="text" value="${escapeHtml(r.colI)}" oninput="updatePreviewRow(${i}, 'colI', this.value)" class="w-24 px-1 py-0.5 border border-slate-300 rounded text-xs text-center bg-white">
+                    </td>
+                    <td class="border border-black px-2 py-1 text-center bg-[#FAFAFA]">
+                        <button onclick="deletePreviewRow(${i})" class="text-rose-600 hover:text-rose-800 p-1 font-bold" title="Delete Row"><i class="fa-solid fa-trash-can"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+
+            const vietRemarkHtml = pkg.type === 'VIETNAM'
+                ? `<div class="inline-block bg-[#F2DCDB] text-red-600 font-bold px-2 py-0.5 text-sm mb-1">請用英文 REMARKS</div><br>`
+                : '';
+
+            const rightSideImgPreview = pkg.type === 'OT' ? `
+                <div class="absolute right-6 top-6">
+                    <img src="${userUploadedShipmarkImageBase64 || cachedUN3091ImageBase64}" alt="UN 3091 Label" class="w-[340px] object-contain border border-slate-300 rounded shadow bg-white p-1" />
+                </div>
+            ` : '';
+
+            document.getElementById('modal-preview-body').innerHTML = `
+                <div class="bg-white p-6 border border-slate-300 rounded-lg shadow-inner relative text-black space-y-4" style="font-family: Calibri, sans-serif;">
+                    ${rightSideImgPreview}
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-slate-500 font-sans">You can edit any cell below, pick MFR# to auto-load data, or add/delete items. Changes update instantly.</span>
+                        <button onclick="addPreviewRow()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded shadow flex items-center gap-1.5 font-sans">
+                            <i class="fa-solid fa-plus"></i> Add Item
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="border-collapse text-xs w-full">
+                            <thead>
+                                <tr>
+                                    <th class="border border-black bg-[#D9D9D9] px-2 py-1 text-center w-10">#</th>
+                                    <th class="border border-black bg-[#D9D9D9] px-3 py-1 text-center font-bold">PO No.</th>
+                                    <th class="border border-black bg-[#D9D9D9] px-3 py-1 text-center font-bold">Customer</th>
+                                    <th class="border border-black bg-[#D9D9D9] px-4 py-1 text-center font-bold min-w-[280px]">Description</th>
+                                    <th class="border border-black bg-[#D9D9D9] px-3 py-1 text-center font-bold">MFR#</th>
+                                    <th class="border border-black bg-[#D9D9D9] px-3 py-1 text-center font-bold">VENDOR</th>
+                                    <th class="border border-black bg-[#D9D9D9] px-2 py-1 text-center font-bold">Country</th>
+                                    <th class="border border-black bg-[#D9D9D9] px-2 py-1 text-center font-bold">Pack</th>
+                                    <th class="border border-black bg-[#D9D9D9] px-3 py-1 text-center font-bold">Category</th>
+                                    <th class="border border-black bg-[#D9D9D9] px-2 py-1 text-center font-bold w-12">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>${dataRowsHtml}</tbody>
+                        </table>
+                    </div>
+
+                    <div class="ml-56 space-y-6 pt-4 font-sans">
+                        <div>
+                            ${vietRemarkHtml}
+                            <div class="inline-block bg-[#F2DCDB] text-red-600 font-bold px-2 py-0.5 text-sm">請更新 REMARKS</div>
+                        </div>
+
+                        <div class="space-y-0">
+                            <div class="inline-block bg-[#FFFF00] text-red-600 font-bold px-2 py-0.5 text-xs">
+                                Please use new logo for ship mark
+                            </div>
+                            <div class="double-border-box p-3 w-[340px] bg-white">
+                                <div class="text-lg font-extrabold tracking-tight text-[#7030A0]">BANDAI NAMCO</div>
+                                <div class="text-[11px] font-bold text-[#7030A0] mt-0.5">Bandai Namco Toys Collectible America Inc.</div>
+                                <div class="h-6"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updatePreviewRow(rowIdx, field, val) {
+            const pkg = generatedVendorPackages[currentEditingPkgIdx];
+            if (!pkg || !pkg.rows[rowIdx]) return;
+            pkg.rows[rowIdx][field === 'colB' ? 'colB' : field === 'colC' ? 'colC' : field === 'colD' ? 'colD' : field === 'colE' ? 'colE' : field === 'colF' ? 'colF' : field === 'colG' ? 'colG' : field === 'colH' ? 'colH' : 'colI'] = val;
+            renderShipmarkCards();
+        }
+
+        function onPreviewMfrChange(rowIdx, mfrVal) {
+            const pkg = generatedVendorPackages[currentEditingPkgIdx];
+            if (!pkg || !pkg.rows[rowIdx]) return;
+            pkg.rows[rowIdx].colE = mfrVal;
+
+            const match = globalTempShipmarkRows.find(r => String(r.colE).trim().toUpperCase() === String(mfrVal).trim().toUpperCase()) ||
+                          globalCargoVolumeRows.find(r => String(r.colB).trim().toUpperCase() === String(mfrVal).trim().toUpperCase());
+            
+            if (match) {
+                pkg.rows[rowIdx].colD = match.colD || match.colC || pkg.rows[rowIdx].colD;
+                pkg.rows[rowIdx].colB = match.colB || match.colQ || pkg.rows[rowIdx].colB;
+                pkg.rows[rowIdx].colF = match.colF || match.colL || pkg.rows[rowIdx].colF;
+                pkg.rows[rowIdx].colG = match.colG || match.colM || pkg.rows[rowIdx].colG;
+                pkg.rows[rowIdx].colH = match.colH || formatPackRatioDisplay(match.colI) || pkg.rows[rowIdx].colH;
+                pkg.rows[rowIdx].colI = match.colI || pkg.rows[rowIdx].colI;
+            }
+
+            renderEditablePreviewTable();
+            renderShipmarkCards();
+            showToast('Item Auto-Loaded', `Loaded details for MFR# ${mfrVal}`, 'info');
+        }
+
+        function addPreviewRow() {
+            const pkg = generatedVendorPackages[currentEditingPkgIdx];
+            if (!pkg) return;
+            pkg.rows.push({
+                seqNo: pkg.rows.length + 1,
+                colB: '',
+                colC: 'BNTCA',
+                colD: '',
+                colE: '',
+                colF: pkg.vendor,
+                colG: pkg.type === 'VIETNAM' ? 'VIETNAM' : 'CHINA',
+                colH: '',
+                colI: '',
+                colM: pkg.rows.length > 0 ? pkg.rows[0].colM : 'Sheet1',
+                templateType: pkg.type
+            });
+            renderEditablePreviewTable();
+            renderShipmarkCards();
+        }
+
+        function deletePreviewRow(rowIdx) {
+            const pkg = generatedVendorPackages[currentEditingPkgIdx];
+            if (!pkg) return;
+            pkg.rows.splice(rowIdx, 1);
+            if (pkg.rows.length === 0) {
+                generatedVendorPackages.splice(currentEditingPkgIdx, 1);
+                closeShipmarkPreviewModal();
+            } else {
+                renderEditablePreviewTable();
+            }
+            renderShipmarkCards();
+            showToast('Item Deleted', 'Row removed from vendor package.', 'warning');
+        }
+
+        function closeShipmarkPreviewModal() {
+            const modal = document.getElementById('modal-shipmark-preview');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            currentEditingPkgIdx = null;
+        }
+
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        let toastTimer = null;
+        function showToast(title, msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            document.getElementById('toast-title').textContent = title;
+            document.getElementById('toast-msg').textContent = msg;
+            icon.className = type === 'success'
+                ? 'fa-solid fa-circle-check text-emerald-400 text-lg'
+                : type === 'warning'
+                    ? 'fa-solid fa-triangle-exclamation text-amber-400 text-lg'
+                    : 'fa-solid fa-circle-info text-blue-400 text-lg';
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3800);
+        }
+    </script>
+</body>
+</html>
