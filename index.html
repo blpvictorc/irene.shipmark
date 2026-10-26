@@ -106,7 +106,7 @@
                         </h2>
                     </div>
                     <p class="text-xs text-slate-500">
-                        Upload <code class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-semibold">BNTCA Order 2026.xlsx</code>. You can edit table values directly in Tab 1 or via Preview Modal; changes instantly update vendor files.
+                        Upload <code class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-semibold">.xlsx</code>. You can edit table values directly in Tab 1 or via Preview Modal; changes instantly update vendor files.
                     </p>
                 </div>
 
@@ -315,7 +315,7 @@
                             <tr>
                                 <td colspan="22" class="py-12 text-center text-slate-400">
                                     <i class="fa-solid fa-file-circle-plus text-2xl mb-2 block text-slate-300"></i>
-                                    No data imported yet. Please upload <strong class="text-slate-600">BNTCA Order 2026.xlsx</strong> above.
+                                    No data imported yet. Please upload <strong class="text-slate-600">.xlsx</strong> above.
                                 </td>
                             </tr>
                         </tbody>
@@ -334,7 +334,7 @@
                             <h2 class="text-base font-bold text-slate-800">Worksheet Column Mapping Matrix (Auto-Detect &amp; Manual Override)</h2>
                         </div>
                         <p class="text-xs text-slate-500 mt-1">
-                            Each worksheet in <code class="bg-slate-100 px-1 rounded">BNTCA Order 2026</code> can have different column positions. System automatically scans Row 3 headers, and you can fine-tune any column letter below.
+                            Each worksheet in <code class="bg-slate-100 px-1 rounded">BNTCA Order</code> can have different column positions. System automatically scans Row 3 headers, and you can fine-tune any column letter below.
                         </p>
                     </div>
 
@@ -1459,7 +1459,7 @@
         }
 
         async function downloadAllOutputsAsZip() {
-            if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload BNTCA Order 2026.xlsx first.', 'warning');
+            if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload BNTCA Order.xlsx first.', 'warning');
             const zip = new JSZip();
             const monthStr = document.getElementById('menu-c3').value;
 
