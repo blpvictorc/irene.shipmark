@@ -540,9 +540,9 @@
             { key: 'qty', label: 'Qty', cvCol: 'D', tsCol: '-', matchKeywords: ['qty', 'quantity'] },
             { key: 'pack', label: 'Pack / Asst Ratio', cvCol: 'I', tsCol: '(Internal)', matchKeywords: ['asst ratio', 'pack'] },
             { key: 'vendor', label: 'Vendor / Factory', cvCol: 'L', tsCol: 'F', matchKeywords: ['vendor', 'factory'] },
-            { key: 'co', label: 'C/O / Origin', cvCol: 'M', tsCol: '(Priority Check)', matchKeywords: ['origin', 'c/o', 'country'] },
-            { key: 'obsDate', label: 'OBS Date', cvCol: 'N', tsCol: '-', matchKeywords: ['obs date'] },
-            { key: 'qciDate', label: 'QCI Date', cvCol: 'O', tsCol: '-', matchKeywords: ['qci date'] },
+            { key: 'co', label: 'C/O / Origin', cvCol: 'M', tsCol: '(Priority Check)', matchKeywords: ['origin', 'c/o', 'country'] },   
+{ key: 'obsDate', label: 'OBS Date', cvCol: 'N', tsCol: '-', matchKeywords: ['obs date'] },
+{ key: 'qciDate', label: 'QCI Date', cvCol: 'O', tsCol: '-', matchKeywords: ['qci date', 'qci'] },
             { key: 'bnaCO', label: 'BNA C/O#', cvCol: 'P', tsCol: '-', matchKeywords: ['bna c/o#', 'bna c/o'] },
             { key: 'bnaPO', label: 'BNA P/O# (PO No.)', cvCol: 'Q', tsCol: 'B', matchKeywords: ['bna p/o#', 'bna p/o', 'po no.'] },
             { key: 'bntcaPO', label: 'BNTCA PO#', cvCol: 'R', tsCol: '-', matchKeywords: ['bntca po no.', 'bntca po#'] }
@@ -1298,13 +1298,22 @@ function formatExcelDate(val) {
             }
         }
 
-        // Live Edit Handler from Tab 1 Table Input Fields
+// Live Edit Handler from Tab 1 Table Input Fields (即時更新 E, J, K 畫面而唔重畫成張 Table)
         function updateCargoVolumeCell(idx, field, val) {
             if (!globalCargoVolumeRows[idx]) return;
             globalCargoVolumeRows[idx][field] = val;
             recalculateSingleCVRowFormulas(globalCargoVolumeRows[idx]);
 
             const cvItem = globalCargoVolumeRows[idx];
+
+            // 精準更新畫面上該行嘅 E (Ctn), J (CBM), K (Total CBM) 數值，唔影響目前輸入框 Focus
+            const elE = document.getElementById(`cv-cell-e-${idx}`);
+            const elJ = document.getElementById(`cv-cell-j-${idx}`);
+            const elK = document.getElementById(`cv-cell-k-${idx}`);
+            if (elE) elE.textContent = cvItem.colE !== undefined ? cvItem.colE : '';
+            if (elJ) elJ.textContent = cvItem.colJ !== undefined ? cvItem.colJ : '';
+            if (elK) elK.textContent = cvItem.colK !== undefined ? cvItem.colK : '';
+
             const matchingTemp = globalTempShipmarkRows.find(t => t.colE === cvItem.colB && t.colB === cvItem.colQ);
             if (matchingTemp) {
                 if (field === 'colC') matchingTemp.colD = val;
@@ -1315,6 +1324,7 @@ function formatExcelDate(val) {
             }
 
             buildVendorShipmarkPackages();
+            renderShipmarkCards();
         }
 
         function buildVendorShipmarkPackages() {
@@ -1547,7 +1557,7 @@ function formatExcelDate(val) {
         // =========================================================================
         // 6. TABLE RENDERING, LIVE EDITING & EXPORTS
         // =========================================================================
-        function renderWorkspaceTables(preserveFocus = false) {
+function renderWorkspaceTables(preserveFocus = false) {
             const searchKw = (document.getElementById('table-search').value || '').trim().toLowerCase();
             const filteredCV = globalCargoVolumeRows.filter(r => {
                 if (!searchKw) return true;
@@ -1570,31 +1580,35 @@ function formatExcelDate(val) {
                                 <input type="text" value="${escapeHtml(i.colC)}" oninput="updateCargoVolumeCell(${realIdx}, 'colC', this.value)" class="w-72 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
                             </td>
                             <td class="py-2 px-3 border-b border-r text-right">
-                                <input type="number" value="${escapeHtml(i.colD)}" oninput="updateCargoVolumeCell(${realIdx}, 'colD', this.value)" class="w-20 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
+                                <input type="text" value="${escapeHtml(i.colD)}" oninput="updateCargoVolumeCell(${realIdx}, 'colD', this.value)" class="w-20 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
                             </td>
-                            <td class="py-2 px-3 border-b border-r text-right text-emerald-700 font-semibold mono-font">${escapeHtml(i.colE)}</td>
+                            <td id="cv-cell-e-${realIdx}" class="py-2 px-3 border-b border-r text-right text-emerald-700 font-semibold mono-font">${escapeHtml(i.colE)}</td>
                             <td class="py-2 px-3 border-b border-r text-right">
-                                <input type="number" step="0.01" value="${escapeHtml(i.colF)}" oninput="updateCargoVolumeCell(${realIdx}, 'colF', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
-                            </td>
-                            <td class="py-2 px-3 border-b border-r text-right">
-                                <input type="number" step="0.01" value="${escapeHtml(i.colG)}" oninput="updateCargoVolumeCell(${realIdx}, 'colG', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
+                                <input type="text" value="${escapeHtml(i.colF)}" oninput="updateCargoVolumeCell(${realIdx}, 'colF', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
                             </td>
                             <td class="py-2 px-3 border-b border-r text-right">
-                                <input type="number" step="0.01" value="${escapeHtml(i.colH)}" oninput="updateCargoVolumeCell(${realIdx}, 'colH', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
+                                <input type="text" value="${escapeHtml(i.colG)}" oninput="updateCargoVolumeCell(${realIdx}, 'colG', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r text-right">
+                                <input type="text" value="${escapeHtml(i.colH)}" oninput="updateCargoVolumeCell(${realIdx}, 'colH', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
                             </td>
                             <td class="py-2 px-3 border-b border-r text-center">
                                 <input type="text" value="${escapeHtml(i.colI)}" oninput="updateCargoVolumeCell(${realIdx}, 'colI', this.value)" class="w-20 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500">
                             </td>
-                            <td class="py-2 px-3 border-b border-r text-right mono-font">${escapeHtml(i.colJ)}</td>
-                            <td class="py-2 px-3 border-b border-r text-right font-semibold text-indigo-600 mono-font">${escapeHtml(i.colK)}</td>
+                            <td id="cv-cell-j-${realIdx}" class="py-2 px-3 border-b border-r text-right mono-font">${escapeHtml(i.colJ)}</td>
+                            <td id="cv-cell-k-${realIdx}" class="py-2 px-3 border-b border-r text-right font-semibold text-indigo-600 mono-font">${escapeHtml(i.colK)}</td>
                             <td class="py-2 px-3 border-b border-r font-bold text-slate-800">
                                 <input type="text" value="${escapeHtml(i.colL)}" oninput="updateCargoVolumeCell(${realIdx}, 'colL', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
                             </td>
                             <td class="py-2 px-3 border-b border-r">
                                 <input type="text" value="${escapeHtml(i.colM)}" oninput="updateCargoVolumeCell(${realIdx}, 'colM', this.value)" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
                             </td>
-                            <td class="py-2 px-3 border-b border-r"><input type="date" value="${escapeHtml(i.colN)}" oninput="updateCargoVolumeCell(${realIdx}, 'colN', this.value)" class="px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
-                            <td class="py-2 px-3 border-b border-r"><input type="date" value="${escapeHtml(i.colO)}" oninput="updateCargoVolumeCell(${realIdx}, 'colO', this.value)" class="px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
+                            <td class="py-2 px-3 border-b border-r">
+                                <input type="text" value="${escapeHtml(i.colN)}" oninput="updateCargoVolumeCell(${realIdx}, 'colN', this.value)" placeholder="mm-dd-yy" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r">
+                                <input type="text" value="${escapeHtml(i.colO)}" oninput="updateCargoVolumeCell(${realIdx}, 'colO', this.value)" placeholder="mm-dd-yy" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500">
+                            </td>
                             <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colP)}" oninput="updateCargoVolumeCell(${realIdx}, 'colP', this.value)" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
                             <td class="py-2 px-3 border-b border-r font-semibold text-blue-700">
                                 <input type="text" value="${escapeHtml(i.colQ)}" oninput="updateCargoVolumeCell(${realIdx}, 'colQ', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
