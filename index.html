@@ -152,9 +152,9 @@
 
                     <!-- Optional Secondary Upload: Loading Plan Match -->
                     <div>
-                        <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition cursor-pointer flex items-center gap-2" title="Optional: Upload Loading Plan">
+                        <label class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition cursor-pointer flex items-center gap-2" title="Upload Cargo Volume / Loading Plan Excel to match L, W, H & Pack">
                             <i class="fa-solid fa-ruler-combined text-sm"></i>
-                            <span>2. Match L/W/H Plan</span>
+                            <span id="match-plan-btn-text">2. Match L/W/H Plan</span>
                             <input type="file" id="file-match-plan" accept=".xlsx, .xls, .xlsm, .xlsb" class="hidden" onchange="handleLoadingPlanMatch(event)">
                         </label>
                     </div>
@@ -192,6 +192,9 @@
                     <span class="flex items-center gap-1.5 text-slate-600">
                         <i class="fa-solid fa-book-open text-amber-500"></i>
                         Description Dict Keys: <strong id="status-desc-count" class="text-slate-800 mono-font">0</strong>
+                    </span>
+                    <span id="status-plan-badge" class="hidden bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full font-semibold border border-indigo-300">
+                        <i class="fa-solid fa-ruler-combined mr-1"></i><span id="status-plan-text">Plan Matched</span>
                     </span>
                     <span id="status-unmapped-badge" class="hidden bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full font-semibold border border-amber-300">
                         <i class="fa-solid fa-triangle-exclamation mr-1"></i><span id="status-unmapped-text"></span>
@@ -766,6 +769,290 @@
             reader.readAsArrayBuffer(file);
         }
 
+        // =========================================================================
+        // 4B. MODULE 1: MATCH L/W/H LOADING PLAN & COLUMN C MISMATCH HANDLER
+        // =========================================================================
+        function findTargetSheetName(sheetNames, primaryTarget, fallbackKeywords) {
+            const pLower = primaryTarget.toLowerCase().trim();
+            // 1. Exact case-insensitive match (e.g., "2026 loading plan" or "Shipped")
+            for (const name of sheetNames) {
+                if (name.toLowerCase().trim() === pLower) return name;
+            }
+            // 2. Fuzzy keyword match (e.g., contains "loading plan", "plan", or "shipped")
+            for (const kw of fallbackKeywords) {
+                const kwLower = kw.toLowerCase();
+                for (const name of sheetNames) {
+                    if (name.toLowerCase().includes(kwLower)) return name;
+                }
+            }
+            return null;
+        }
+
+        function buildPlanDictionaries(ws, dictLIB, dictLB) {
+            if (!ws) return;
+            const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+            // VBA: For i = 2 To lastRow (0-indexed r = 1 to aoa.length - 1)
+            for (let r = 1; r < aoa.length; r++) {
+                const row = aoa[r];
+                if (!row || row.length === 0) continue;
+
+                // Col B = index 1, Col C = index 2, Col F = index 5, Col G = index 6, Col H = index 7, Col I = index 8, Col L = index 11
+                const vB = String(row[1] !== undefined && row[1] !== null ? row[1] : '').trim();
+                const vC = String(row[2] !== undefined && row[2] !== null ? row[2] : '').trim();
+                const vF = row[5] !== undefined && row[5] !== null ? row[5] : '';
+                const vG = row[6] !== undefined && row[6] !== null ? row[6] : '';
+                const vH = row[7] !== undefined && row[7] !== null ? row[7] : '';
+                const rawI = row[8];
+                const vI = rawI instanceof Date ? `${rawI.getHours()}:${rawI.getMinutes()}` : String(rawI !== undefined && rawI !== null ? rawI : '').trim();
+                const vL = String(row[11] !== undefined && row[11] !== null ? row[11] : '').trim();
+
+                if (!vL && !vB) continue;
+
+                // Normalize keys to uppercase so matching is resilient while preserving last-row overwrite behavior
+                const keyLIB = `${vL.toUpperCase()}|${vI.toUpperCase()}|${vB.toUpperCase()}`;
+                const keyLB = `${vL.toUpperCase()}|${vB.toUpperCase()}`;
+
+                const rowRecord = {
+                    colC: vC,
+                    colF: vF,
+                    colG: vG,
+                    colH: vH,
+                    colI: vI
+                };
+
+                dictLIB[keyLIB] = rowRecord;
+                dictLB[keyLB] = rowRecord;
+            }
+        }
+
+        function parseColonRatioToString(val) {
+            if (val === null || val === undefined || val === '') return '';
+            let str = val instanceof Date ? `${val.getHours()}:${val.getMinutes()}` : String(val).trim();
+            if (str.includes(':')) {
+                const splitArr = str.split(':');
+                let sumRatio = 0;
+                splitArr.forEach(part => {
+                    const tempStr = part.replace(/AM|PM/gi, '').trim();
+                    if (tempStr !== '' && !isNaN(Number(tempStr))) {
+                        sumRatio += Number(tempStr);
+                    }
+                });
+                return String(sumRatio);
+            }
+            return str;
+        }
+
+        function applyModule1FormulasToRow(cvRow) {
+            const valL = String(cvRow.colL || '').trim();
+            if (valL === '') return;
+
+            // Re-read and sum Column I if it contains colons (:)
+            let valI = parseColonRatioToString(cvRow.colI);
+            cvRow.colI = valI !== '' && !isNaN(Number(valI)) ? Number(valI) : valI;
+
+            // Calculate Column J: =(F*G*H)/1728/35.32
+            const L = parseFloat(cvRow.colF);
+            const W = parseFloat(cvRow.colG);
+            const H = parseFloat(cvRow.colH);
+            if (!isNaN(L) && !isNaN(W) && !isNaN(H) && L > 0 && W > 0 && H > 0) {
+                cvRow.colJ = Number(((L * W * H) / 1728 / 35.32).toFixed(6));
+            } else {
+                cvRow.colJ = '';
+            }
+
+            // CRITICAL FIX from Module1.bas: Actively clear Column E first to wipe out any old values
+            cvRow.colE = '';
+            cvRow.colK = '';
+
+            // Check if Column I is a valid numeric non-zero integer
+            if (valI !== '' && !isNaN(Number(valI))) {
+                const dblI = Number(valI);
+                const qty = parseFloat(cvRow.colD);
+                if (Number.isInteger(dblI) && dblI !== 0 && !isNaN(qty)) {
+                    cvRow.colE = Number((qty / dblI).toFixed(2));
+                    if (cvRow.colJ !== '') {
+                        cvRow.colK = Number(((qty / dblI) * cvRow.colJ).toFixed(4));
+                    }
+                }
+            }
+        }
+
+        function handleLoadingPlanMatch(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (globalCargoVolumeRows.length === 0) {
+                showToast('Upload Order File First', 'Please upload Step 1 Order Excel (BNTCA) before matching L/W/H Plan.', 'warning');
+                e.target.value = '';
+                return;
+            }
+
+            const planFileName = file.name;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const wbSource = XLSX.read(data, { type: 'array', cellDates: true });
+
+                    // Find "2026 loading plan" (or similar name) and "Shipped" (or similar name)
+                    const planSheetName = findTargetSheetName(wbSource.SheetNames, '2026 loading plan', ['loading plan', 'loading', 'plan']);
+                    const shippedSheetName = findTargetSheetName(wbSource.SheetNames, 'Shipped', ['shipped', 'ship']);
+
+                    if (!planSheetName && !shippedSheetName) {
+                        alert(`Could not find "2026 loading plan" or "Shipped" (or similar sheets) in "${planFileName}".\nAvailable sheets: ${wbSource.SheetNames.join(', ')}`);
+                        e.target.value = '';
+                        return;
+                    }
+
+                    const dictPlanLIB = {}, dictPlanLB = {};
+                    const dictShippedLIB = {}, dictShippedLB = {};
+
+                    if (planSheetName) {
+                        buildPlanDictionaries(wbSource.Sheets[planSheetName], dictPlanLIB, dictPlanLB);
+                    }
+                    if (shippedSheetName) {
+                        buildPlanDictionaries(wbSource.Sheets[shippedSheetName], dictShippedLIB, dictShippedLB);
+                    }
+
+                    mismatchQueue = [];
+                    let matchedCount = 0;
+
+                    // Loop through Target "Cargo Volume" rows and fill data
+                    globalCargoVolumeRows.forEach((cvRow, idx) => {
+                        let valL = String(cvRow.colL || '').trim();
+                        const valB = String(cvRow.colB || '').trim();
+
+                        // Check and sum values in Column I if it contains colons (:)
+                        let valI = parseColonRatioToString(cvRow.colI);
+                        cvRow.colI = valI !== '' && !isNaN(Number(valI)) ? Number(valI) : valI;
+
+                        // Transform Column L values for the Key (DOUBLE -> DOUBLE CHIN, RS -> RIGHT SOURCE)
+                        let lookupL = valL;
+                        if (lookupL.toUpperCase() === 'DOUBLE') {
+                            lookupL = 'DOUBLE CHIN';
+                        } else if (lookupL.toUpperCase() === 'RS') {
+                            lookupL = 'RIGHT SOURCE';
+                        }
+
+                        const isI_Valid = valI !== '' && !isNaN(Number(valI));
+                        const keyLIB = `${lookupL.toUpperCase()}|${String(valI).toUpperCase()}|${valB.toUpperCase()}`;
+                        const keyLB = `${lookupL.toUpperCase()}|${valB.toUpperCase()}`;
+
+                        let matchedRecord = null;
+
+                        if (isI_Valid) {
+                            if (dictPlanLIB[keyLIB]) {
+                                matchedRecord = dictPlanLIB[keyLIB];
+                            } else if (dictShippedLIB[keyLIB]) {
+                                matchedRecord = dictShippedLIB[keyLIB];
+                            }
+                        } else {
+                            if (dictPlanLB[keyLB]) {
+                                matchedRecord = dictPlanLB[keyLB];
+                            } else if (dictShippedLB[keyLB]) {
+                                matchedRecord = dictShippedLB[keyLB];
+                            }
+                        }
+
+                        // Fill Data if matched (F, G, H copied; if I was invalid, copy I; check Col C mismatch)
+                        if (matchedRecord) {
+                            matchedCount++;
+                            cvRow.colF = matchedRecord.colF !== '' && !isNaN(Number(matchedRecord.colF)) ? Number(matchedRecord.colF) : matchedRecord.colF;
+                            cvRow.colG = matchedRecord.colG !== '' && !isNaN(Number(matchedRecord.colG)) ? Number(matchedRecord.colG) : matchedRecord.colG;
+                            cvRow.colH = matchedRecord.colH !== '' && !isNaN(Number(matchedRecord.colH)) ? Number(matchedRecord.colH) : matchedRecord.colH;
+
+                            if (!isI_Valid) {
+                                cvRow.colI = matchedRecord.colI;
+                                const matchingTemp = globalTempShipmarkRows.find(t => t.colE === cvRow.colB && t.colB === cvRow.colQ);
+                                if (matchingTemp) {
+                                    matchingTemp.colH = formatPackRatioDisplay(matchedRecord.colI);
+                                }
+                            }
+
+                            const valCTool = String(cvRow.colC || '').trim();
+                            const valCImport = String(matchedRecord.colC || '').trim();
+
+                            if (valCTool !== valCImport) {
+                                mismatchQueue.push({
+                                    cvIdx: idx,
+                                    rowNum: cvRow.rowNum,
+                                    asstNo: cvRow.colB,
+                                    toolVal: valCTool,
+                                    importVal: valCImport
+                                });
+                            }
+                        }
+
+                        // Apply Step 5 Formulas for Columns J, K, and E
+                        applyModule1FormulasToRow(cvRow);
+                    });
+
+                    // Update UI & Status Badge
+                    const planBadge = document.getElementById('status-plan-badge');
+                    const planText = document.getElementById('status-plan-text');
+                    planBadge.classList.remove('hidden');
+                    const matchedSheetsInfo = [planSheetName, shippedSheetName].filter(Boolean).join(' + ');
+                    planText.textContent = `Plan Matched: ${matchedCount}/${globalCargoVolumeRows.length} rows (${matchedSheetsInfo})`;
+
+                    buildVendorShipmarkPackages();
+                    renderWorkspaceTables();
+                    renderShipmarkCards();
+
+                    // Process Column C Mismatches with Modal Popup if any
+                    if (mismatchQueue.length > 0) {
+                        currentMismatchIdx = 0;
+                        showNextMismatchModal();
+                    } else {
+                        showToast('Data Import & Match Complete', `Matched ${matchedCount} rows from [${matchedSheetsInfo}]. No Column C mismatches found.`, 'success');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error matching Loading Plan Excel: ' + err.message);
+                } finally {
+                    e.target.value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function showNextMismatchModal() {
+            const modal = document.getElementById('modal-mismatch');
+            if (currentMismatchIdx >= mismatchQueue.length) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                buildVendorShipmarkPackages();
+                renderWorkspaceTables();
+                renderShipmarkCards();
+                showToast('Match & Mismatch Review Complete', 'Data import and matching completed successfully!', 'success');
+                return;
+            }
+
+            const item = mismatchQueue[currentMismatchIdx];
+            document.getElementById('mismatch-counter').textContent = `${currentMismatchIdx + 1} / ${mismatchQueue.length}`;
+            document.getElementById('mismatch-row-info').textContent = `#${item.rowNum - 1} (Asst No: ${item.asstNo})`;
+            document.getElementById('mismatch-tool-val').textContent = item.toolVal || '(Blank)';
+            document.getElementById('mismatch-import-val').textContent = item.importVal || '(Blank)';
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function resolveMismatchChoice(keepTool) {
+            const item = mismatchQueue[currentMismatchIdx];
+            if (!keepTool && item && globalCargoVolumeRows[item.cvIdx]) {
+                const cvRow = globalCargoVolumeRows[item.cvIdx];
+                cvRow.colC = item.importVal;
+
+                // Also sync description to TempShipmarkRows so Vendor Shipmark files stay updated
+                const matchingTemp = globalTempShipmarkRows.find(t => t.colE === cvRow.colB && t.colB === cvRow.colQ);
+                if (matchingTemp) {
+                    matchingTemp.colD = item.importVal;
+                }
+            }
+            currentMismatchIdx++;
+            showNextMismatchModal();
+        }
+
         function updateMfrSuggestionsDatalist() {
             const datalist = document.getElementById('mfr-suggestions');
             const uniqueMfrs = [...new Set(globalTempShipmarkRows.map(r => r.colE).filter(Boolean))];
@@ -989,7 +1276,11 @@
             const qty = parseFloat(cvRow.colD), pack = parseFloat(cvRow.colI), L = parseFloat(cvRow.colF), W = parseFloat(cvRow.colG), H = parseFloat(cvRow.colH);
             if (!isNaN(L) && !isNaN(W) && !isNaN(H) && L > 0 && W > 0 && H > 0) {
                 cvRow.colJ = Number(((L * W * H) / 1728 / 35.32).toFixed(6));
+            } else {
+                cvRow.colJ = '';
             }
+            cvRow.colE = '';
+            cvRow.colK = '';
             if (!isNaN(pack) && Number.isInteger(pack) && pack !== 0 && !isNaN(qty)) {
                 cvRow.colE = Number((qty / pack).toFixed(2));
                 if (cvRow.colJ !== '') cvRow.colK = Number(((qty / pack) * cvRow.colJ).toFixed(4));
@@ -1488,7 +1779,6 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
-
         // =========================================================================
         // 8. FULLY EDITABLE PREVIEW MODAL WITH MFR# AUTO-LOAD & ADD/DELETE ITEMS
         // =========================================================================
@@ -1685,6 +1975,304 @@
             modal.classList.add('hidden');
             modal.classList.remove('flex');
             currentEditingPkgIdx = null;
+        }
+
+        // =========================================================================
+        // 9. MODULE 1: MATCH L/W/H LOADING PLAN & COLUMN C MISMATCH HANDLER
+        // =========================================================================
+        function findTargetSheetName(sheetNames, primaryTarget, fallbackKeywords) {
+            const pLower = primaryTarget.toLowerCase().trim();
+            // 1. Exact case-insensitive match (e.g., "2026 loading plan" or "Shipped")
+            for (const name of sheetNames) {
+                if (name.toLowerCase().trim() === pLower) return name;
+            }
+            // 2. Fuzzy keyword match (e.g., contains "loading plan", "plan", or "shipped")
+            for (const kw of fallbackKeywords) {
+                const kwLower = kw.toLowerCase();
+                for (const name of sheetNames) {
+                    if (name.toLowerCase().includes(kwLower)) return name;
+                }
+            }
+            return null;
+        }
+
+        function buildPlanDictionaries(ws, dictLIB, dictLB) {
+            if (!ws) return;
+            const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+            // VBA: For i = 2 To lastRow (0-indexed r = 1 to aoa.length - 1)
+            for (let r = 1; r < aoa.length; r++) {
+                const row = aoa[r];
+                if (!row || row.length === 0) continue;
+
+                // Col B = index 1, Col C = index 2, Col F = index 5, Col G = index 6, Col H = index 7, Col I = index 8, Col L = index 11
+                const vB = String(row[1] !== undefined && row[1] !== null ? row[1] : '').trim();
+                const vC = String(row[2] !== undefined && row[2] !== null ? row[2] : '').trim();
+                const vF = row[5] !== undefined && row[5] !== null ? row[5] : '';
+                const vG = row[6] !== undefined && row[6] !== null ? row[6] : '';
+                const vH = row[7] !== undefined && row[7] !== null ? row[7] : '';
+                const rawI = row[8];
+                const vI = rawI instanceof Date ? `${rawI.getHours()}:${rawI.getMinutes()}` : String(rawI !== undefined && rawI !== null ? rawI : '').trim();
+                const vL = String(row[11] !== undefined && row[11] !== null ? row[11] : '').trim();
+
+                if (!vL && !vB) continue;
+
+                // Normalize keys to uppercase so matching is resilient while preserving last-row overwrite behavior
+                const keyLIB = `${vL.toUpperCase()}|${vI.toUpperCase()}|${vB.toUpperCase()}`;
+                const keyLB = `${vL.toUpperCase()}|${vB.toUpperCase()}`;
+
+                const rowRecord = {
+                    colC: vC,
+                    colF: vF,
+                    colG: vG,
+                    colH: vH,
+                    colI: vI
+                };
+
+                dictLIB[keyLIB] = rowRecord;
+                dictLB[keyLB] = rowRecord;
+            }
+        }
+
+        function parseColonRatioToString(val) {
+            if (val === null || val === undefined || val === '') return '';
+            let str = val instanceof Date ? `${val.getHours()}:${val.getMinutes()}` : String(val).trim();
+            if (str.includes(':')) {
+                const splitArr = str.split(':');
+                let sumRatio = 0;
+                splitArr.forEach(part => {
+                    const tempStr = part.replace(/AM|PM/gi, '').trim();
+                    if (tempStr !== '' && !isNaN(Number(tempStr))) {
+                        sumRatio += Number(tempStr);
+                    }
+                });
+                return String(sumRatio);
+            }
+            return str;
+        }
+
+        function applyModule1FormulasToRow(cvRow) {
+            const valL = String(cvRow.colL || '').trim();
+            if (valL === '') return;
+
+            // Re-read and sum Column I if it contains colons (:)
+            let valI = parseColonRatioToString(cvRow.colI);
+            cvRow.colI = valI !== '' && !isNaN(Number(valI)) ? Number(valI) : valI;
+
+            // Calculate Column J: =(F*G*H)/1728/35.32
+            const L = parseFloat(cvRow.colF);
+            const W = parseFloat(cvRow.colG);
+            const H = parseFloat(cvRow.colH);
+            if (!isNaN(L) && !isNaN(W) && !isNaN(H) && L > 0 && W > 0 && H > 0) {
+                cvRow.colJ = Number(((L * W * H) / 1728 / 35.32).toFixed(6));
+            } else {
+                cvRow.colJ = '';
+            }
+
+            // CRITICAL FIX from Module1.bas: Actively clear Column E first to wipe out any old values
+            cvRow.colE = '';
+            cvRow.colK = '';
+
+            // Check if Column I is a valid numeric non-zero integer
+            if (valI !== '' && !isNaN(Number(valI))) {
+                const dblI = Number(valI);
+                const qty = parseFloat(cvRow.colD);
+                if (Number.isInteger(dblI) && dblI !== 0 && !isNaN(qty)) {
+                    cvRow.colE = Number((qty / dblI).toFixed(2));
+                    if (cvRow.colJ !== '') {
+                        cvRow.colK = Number(((qty / dblI) * cvRow.colJ).toFixed(4));
+                    }
+                }
+            }
+        }
+
+        function handleLoadingPlanMatch(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (globalCargoVolumeRows.length === 0) {
+                showToast('Upload Order File First', 'Please upload Step 1 Order Excel (BNTCA) before matching L/W/H Plan.', 'warning');
+                e.target.value = '';
+                return;
+            }
+
+            const planFileName = file.name;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const wbSource = XLSX.read(data, { type: 'array', cellDates: true });
+
+                    // Find "2026 loading plan" (or similar name) and "Shipped" (or similar name)
+                    const planSheetName = findTargetSheetName(wbSource.SheetNames, '2026 loading plan', ['loading plan', 'loading', 'plan']);
+                    const shippedSheetName = findTargetSheetName(wbSource.SheetNames, 'Shipped', ['shipped', 'ship']);
+
+                    if (!planSheetName && !shippedSheetName) {
+                        alert(`Could not find "2026 loading plan" or "Shipped" (or similar sheets) in "${planFileName}".\nAvailable sheets: ${wbSource.SheetNames.join(', ')}`);
+                        e.target.value = '';
+                        return;
+                    }
+
+                    const dictPlanLIB = {}, dictPlanLB = {};
+                    const dictShippedLIB = {}, dictShippedLB = {};
+
+                    if (planSheetName) {
+                        buildPlanDictionaries(wbSource.Sheets[planSheetName], dictPlanLIB, dictPlanLB);
+                    }
+                    if (shippedSheetName) {
+                        buildPlanDictionaries(wbSource.Sheets[shippedSheetName], dictShippedLIB, dictShippedLB);
+                    }
+
+                    mismatchQueue = [];
+                    let matchedCount = 0;
+
+                    // Loop through Target "Cargo Volume" rows and fill data
+                    globalCargoVolumeRows.forEach((cvRow, idx) => {
+                        let valL = String(cvRow.colL || '').trim();
+                        const valB = String(cvRow.colB || '').trim();
+
+                        // Check and sum values in Column I if it contains colons (:)
+                        let valI = parseColonRatioToString(cvRow.colI);
+                        cvRow.colI = valI !== '' && !isNaN(Number(valI)) ? Number(valI) : valI;
+
+                        // Transform Column L values for the Key (DOUBLE -> DOUBLE CHIN, RS -> RIGHT SOURCE)
+                        let lookupL = valL;
+                        if (lookupL.toUpperCase() === 'DOUBLE') {
+                            lookupL = 'DOUBLE CHIN';
+                        } else if (lookupL.toUpperCase() === 'RS') {
+                            lookupL = 'RIGHT SOURCE';
+                        }
+
+                        const isI_Valid = valI !== '' && !isNaN(Number(valI));
+                        const keyLIB = `${lookupL.toUpperCase()}|${String(valI).toUpperCase()}|${valB.toUpperCase()}`;
+                        const keyLB = `${lookupL.toUpperCase()}|${valB.toUpperCase()}`;
+
+                        let matchedRecord = null;
+
+                        if (isI_Valid) {
+                            if (dictPlanLIB[keyLIB]) {
+                                matchedRecord = dictPlanLIB[keyLIB];
+                            } else if (dictShippedLIB[keyLIB]) {
+                                matchedRecord = dictShippedLIB[keyLIB];
+                            }
+                        } else {
+                            if (dictPlanLB[keyLB]) {
+                                matchedRecord = dictPlanLB[keyLB];
+                            } else if (dictShippedLB[keyLB]) {
+                                matchedRecord = dictShippedLB[keyLB];
+                            }
+                        }
+
+                        // Fill Data if matched (F, G, H copied; if I was invalid, copy I; check Col C mismatch)
+                        if (matchedRecord) {
+                            matchedCount++;
+                            cvRow.colF = matchedRecord.colF !== '' && !isNaN(Number(matchedRecord.colF)) ? Number(matchedRecord.colF) : matchedRecord.colF;
+                            cvRow.colG = matchedRecord.colG !== '' && !isNaN(Number(matchedRecord.colG)) ? Number(matchedRecord.colG) : matchedRecord.colG;
+                            cvRow.colH = matchedRecord.colH !== '' && !isNaN(Number(matchedRecord.colH)) ? Number(matchedRecord.colH) : matchedRecord.colH;
+
+                            if (!isI_Valid) {
+                                cvRow.colI = matchedRecord.colI;
+                                const matchingTemp = globalTempShipmarkRows.find(t => t.colE === cvRow.colB && t.colB === cvRow.colQ);
+                                if (matchingTemp) {
+                                    matchingTemp.colH = formatPackRatioDisplay(matchedRecord.colI);
+                                }
+                            }
+
+                            const valCTool = String(cvRow.colC || '').trim();
+                            const valCImport = String(matchedRecord.colC || '').trim();
+
+                            if (valCTool !== valCImport) {
+                                mismatchQueue.push({
+                                    cvIdx: idx,
+                                    rowNum: cvRow.rowNum,
+                                    asstNo: cvRow.colB,
+                                    toolVal: valCTool,
+                                    importVal: valCImport
+                                });
+                            }
+                        }
+
+                        // Apply Step 5 Formulas for Columns J, K, and E
+                        applyModule1FormulasToRow(cvRow);
+                    });
+
+                    // Update UI & Status Badge (auto-create badge in status bar if not present)
+                    const matchedSheetsInfo = [planSheetName, shippedSheetName].filter(Boolean).join(' + ');
+                    let planBadge = document.getElementById('status-plan-badge');
+                    if (!planBadge) {
+                        const imgBadge = document.getElementById('status-img-badge');
+                        if (imgBadge && imgBadge.parentNode) {
+                            planBadge = document.createElement('span');
+                            planBadge.id = 'status-plan-badge';
+                            planBadge.className = 'bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full font-semibold border border-indigo-300';
+                            planBadge.innerHTML = `<i class="fa-solid fa-ruler-combined mr-1"></i><span id="status-plan-text"></span>`;
+                            imgBadge.parentNode.insertBefore(planBadge, imgBadge);
+                        }
+                    }
+                    if (planBadge) {
+                        planBadge.classList.remove('hidden');
+                        const planText = document.getElementById('status-plan-text');
+                        if (planText) {
+                            planText.textContent = `Plan Matched: ${matchedCount}/${globalCargoVolumeRows.length} rows (${matchedSheetsInfo})`;
+                        }
+                    }
+
+                    buildVendorShipmarkPackages();
+                    renderWorkspaceTables();
+                    renderShipmarkCards();
+
+                    // Process Column C Mismatches with Modal Popup if any
+                    if (mismatchQueue.length > 0) {
+                        currentMismatchIdx = 0;
+                        showNextMismatchModal();
+                    } else {
+                        showToast('Data Import & Match Complete', `Matched ${matchedCount} rows from [${matchedSheetsInfo}]. No Column C mismatches found.`, 'success');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error matching Loading Plan Excel: ' + err.message);
+                } finally {
+                    e.target.value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function showNextMismatchModal() {
+            const modal = document.getElementById('modal-mismatch');
+            if (currentMismatchIdx >= mismatchQueue.length) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                buildVendorShipmarkPackages();
+                renderWorkspaceTables();
+                renderShipmarkCards();
+                showToast('Match & Mismatch Review Complete', 'Data import and matching completed successfully!', 'success');
+                return;
+            }
+
+            const item = mismatchQueue[currentMismatchIdx];
+            document.getElementById('mismatch-counter').textContent = `${currentMismatchIdx + 1} / ${mismatchQueue.length}`;
+            document.getElementById('mismatch-row-info').textContent = `#${item.rowNum - 1} (Asst No: ${item.asstNo})`;
+            document.getElementById('mismatch-tool-val').textContent = item.toolVal || '(Blank)';
+            document.getElementById('mismatch-import-val').textContent = item.importVal || '(Blank)';
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function resolveMismatchChoice(keepTool) {
+            const item = mismatchQueue[currentMismatchIdx];
+            if (!keepTool && item && globalCargoVolumeRows[item.cvIdx]) {
+                const cvRow = globalCargoVolumeRows[item.cvIdx];
+                cvRow.colC = item.importVal;
+
+                // Also sync description to TempShipmarkRows so Vendor Shipmark files stay updated
+                const matchingTemp = globalTempShipmarkRows.find(t => t.colE === cvRow.colB && t.colB === cvRow.colQ);
+                if (matchingTemp) {
+                    matchingTemp.colD = item.importVal;
+                }
+            }
+            currentMismatchIdx++;
+            showNextMismatchModal();
         }
 
         function escapeHtml(str) {
