@@ -726,16 +726,27 @@
             return idx - 1;
         }
 
-        function formatExcelDate(val) {
-            if (val === null || val === undefined || val === '') return '';
-            if (typeof val === 'number' && val > 20000 && val < 90000) {
-                const utcDays = Math.floor(val - 25569);
-                const d = new Date(utcDays * 86400 * 1000);
-                if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-            }
-            if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString().split('T')[0];
-            return String(val).trim();
-        }
+function formatExcelDate(val) {
+    if (val === null || val === undefined || val === '') return '';
+    let d = null;
+    if (typeof val === 'number' && val > 20000 && val < 90000) {
+        const utcDays = Math.floor(val - 25569);
+        d = new Date(utcDays * 86400 * 1000);
+    } else if (val instanceof Date) {
+        d = val;
+    } else {
+        const parsed = new Date(val);
+        if (!isNaN(parsed.getTime())) d = parsed;
+    }
+    
+    if (d && !isNaN(d.getTime())) {
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const yy = String(d.getFullYear()).slice(-2);
+        return `${mm}/${dd}/${yy}`;
+    }
+    return String(val).trim();
+}
 
         // =========================================================================
         // 4. EXCEL IMPORT & DATA PROCESSING
