@@ -541,8 +541,8 @@
             { key: 'pack', label: 'Pack / Asst Ratio', cvCol: 'I', tsCol: '(Internal)', matchKeywords: ['asst ratio', 'pack'] },
             { key: 'vendor', label: 'Vendor / Factory', cvCol: 'L', tsCol: 'F', matchKeywords: ['vendor', 'factory'] },
             { key: 'co', label: 'C/O / Origin', cvCol: 'M', tsCol: '(Priority Check)', matchKeywords: ['origin', 'c/o', 'country'] },   
-{ key: 'obsDate', label: 'OBS Date', cvCol: 'N', tsCol: '-', matchKeywords: ['obs date'] },
-{ key: 'qciDate', label: 'QCI Date', cvCol: 'O', tsCol: '-', matchKeywords: ['qci date', 'qci'] },
+            { key: 'obsDate', label: 'OBS Date', cvCol: 'N', tsCol: '-', matchKeywords: ['obs date'] },
+            { key: 'qciDate', label: 'QCI Date', cvCol: 'O', tsCol: '-', matchKeywords: ['qci date', 'qci'] },
             { key: 'bnaCO', label: 'BNA C/O#', cvCol: 'P', tsCol: '-', matchKeywords: ['bna c/o#', 'bna c/o'] },
             { key: 'bnaPO', label: 'BNA P/O# (PO No.)', cvCol: 'Q', tsCol: 'B', matchKeywords: ['bna p/o#', 'bna p/o', 'po no.'] },
             { key: 'bntcaPO', label: 'BNTCA PO#', cvCol: 'R', tsCol: '-', matchKeywords: ['bntca po no.', 'bntca po#'] }
@@ -571,7 +571,7 @@
             const now = new Date();
             const months = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
             document.getElementById('export-date-str').value = `${months[now.getMonth()]} ${now.getDate()}`;
-            
+
             if (userUploadedShipmarkImageBase64) {
                 document.getElementById('status-img-text').textContent = 'Image Memory: Ready (Saved)';
             }
@@ -726,27 +726,27 @@
             return idx - 1;
         }
 
-function formatExcelDate(val) {
-    if (val === null || val === undefined || val === '') return '';
-    let d = null;
-    if (typeof val === 'number' && val > 20000 && val < 90000) {
-        const utcDays = Math.floor(val - 25569);
-        d = new Date(utcDays * 86400 * 1000);
-    } else if (val instanceof Date) {
-        d = val;
-    } else {
-        const parsed = new Date(val);
-        if (!isNaN(parsed.getTime())) d = parsed;
-    }
-    
-    if (d && !isNaN(d.getTime())) {
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        const yy = String(d.getFullYear()).slice(-2);
-        return `${mm}/${dd}/${yy}`;
-    }
-    return String(val).trim();
-}
+        function formatExcelDate(val) {
+            if (val === null || val === undefined || val === '') return '';
+            let d = null;
+            if (typeof val === 'number' && val > 20000 && val < 90000) {
+                const utcDays = Math.floor(val - 25569);
+                d = new Date(utcDays * 86400 * 1000);
+            } else if (val instanceof Date) {
+                d = val;
+            } else {
+                const parsed = new Date(val);
+                if (!isNaN(parsed.getTime())) d = parsed;
+            }
+
+            if (d && !isNaN(d.getTime())) {
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                const yy = String(d.getFullYear()).slice(-2);
+                return `${mm}/${dd}/${yy}`;
+            }
+            return String(val).trim();
+        }
 
         // =========================================================================
         // 4. EXCEL IMPORT & DATA PROCESSING
@@ -785,11 +785,9 @@ function formatExcelDate(val) {
         // =========================================================================
         function findTargetSheetName(sheetNames, primaryTarget, fallbackKeywords) {
             const pLower = primaryTarget.toLowerCase().trim();
-            // 1. Exact case-insensitive match (e.g., "2026 loading plan" or "Shipped")
             for (const name of sheetNames) {
                 if (name.toLowerCase().trim() === pLower) return name;
             }
-            // 2. Fuzzy keyword match (e.g., contains "loading plan", "plan", or "shipped")
             for (const kw of fallbackKeywords) {
                 const kwLower = kw.toLowerCase();
                 for (const name of sheetNames) {
@@ -802,12 +800,10 @@ function formatExcelDate(val) {
         function buildPlanDictionaries(ws, dictLIB, dictLB) {
             if (!ws) return;
             const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
-            // VBA: For i = 2 To lastRow (0-indexed r = 1 to aoa.length - 1)
             for (let r = 1; r < aoa.length; r++) {
                 const row = aoa[r];
                 if (!row || row.length === 0) continue;
 
-                // Col B = index 1, Col C = index 2, Col F = index 5, Col G = index 6, Col H = index 7, Col I = index 8, Col L = index 11
                 const vB = String(row[1] !== undefined && row[1] !== null ? row[1] : '').trim();
                 const vC = String(row[2] !== undefined && row[2] !== null ? row[2] : '').trim();
                 const vF = row[5] !== undefined && row[5] !== null ? row[5] : '';
@@ -819,7 +815,6 @@ function formatExcelDate(val) {
 
                 if (!vL && !vB) continue;
 
-                // Normalize keys to uppercase so matching is resilient while preserving last-row overwrite behavior
                 const keyLIB = `${vL.toUpperCase()}|${vI.toUpperCase()}|${vB.toUpperCase()}`;
                 const keyLB = `${vL.toUpperCase()}|${vB.toUpperCase()}`;
 
@@ -857,11 +852,9 @@ function formatExcelDate(val) {
             const valL = String(cvRow.colL || '').trim();
             if (valL === '') return;
 
-            // Re-read and sum Column I if it contains colons (:)
             let valI = parseColonRatioToString(cvRow.colI);
             cvRow.colI = valI !== '' && !isNaN(Number(valI)) ? Number(valI) : valI;
 
-            // Calculate Column J: =(F*G*H)/1728/35.32
             const L = parseFloat(cvRow.colF);
             const W = parseFloat(cvRow.colG);
             const H = parseFloat(cvRow.colH);
@@ -871,11 +864,9 @@ function formatExcelDate(val) {
                 cvRow.colJ = '';
             }
 
-            // CRITICAL FIX from Module1.bas: Actively clear Column E first to wipe out any old values
             cvRow.colE = '';
             cvRow.colK = '';
 
-            // Check if Column I is a valid numeric non-zero integer
             if (valI !== '' && !isNaN(Number(valI))) {
                 const dblI = Number(valI);
                 const qty = parseFloat(cvRow.colD);
@@ -905,7 +896,6 @@ function formatExcelDate(val) {
                     const data = new Uint8Array(evt.target.result);
                     const wbSource = XLSX.read(data, { type: 'array', cellDates: true });
 
-                    // Find "2026 loading plan" (or similar name) and "Shipped" (or similar name)
                     const planSheetName = findTargetSheetName(wbSource.SheetNames, '2026 loading plan', ['loading plan', 'loading', 'plan']);
                     const shippedSheetName = findTargetSheetName(wbSource.SheetNames, 'Shipped', ['shipped', 'ship']);
 
@@ -928,16 +918,13 @@ function formatExcelDate(val) {
                     mismatchQueue = [];
                     let matchedCount = 0;
 
-                    // Loop through Target "Cargo Volume" rows and fill data
                     globalCargoVolumeRows.forEach((cvRow, idx) => {
                         let valL = String(cvRow.colL || '').trim();
                         const valB = String(cvRow.colB || '').trim();
 
-                        // Check and sum values in Column I if it contains colons (:)
                         let valI = parseColonRatioToString(cvRow.colI);
                         cvRow.colI = valI !== '' && !isNaN(Number(valI)) ? Number(valI) : valI;
 
-                        // Transform Column L values for the Key (DOUBLE -> DOUBLE CHIN, RS -> RIGHT SOURCE)
                         let lookupL = valL;
                         if (lookupL.toUpperCase() === 'DOUBLE') {
                             lookupL = 'DOUBLE CHIN';
@@ -965,7 +952,6 @@ function formatExcelDate(val) {
                             }
                         }
 
-                        // Fill Data if matched (F, G, H copied; if I was invalid, copy I; check Col C mismatch)
                         if (matchedRecord) {
                             matchedCount++;
                             cvRow.colF = matchedRecord.colF !== '' && !isNaN(Number(matchedRecord.colF)) ? Number(matchedRecord.colF) : matchedRecord.colF;
@@ -994,22 +980,33 @@ function formatExcelDate(val) {
                             }
                         }
 
-                        // Apply Step 5 Formulas for Columns J, K, and E
                         applyModule1FormulasToRow(cvRow);
                     });
 
-                    // Update UI & Status Badge
-                    const planBadge = document.getElementById('status-plan-badge');
-                    const planText = document.getElementById('status-plan-text');
-                    planBadge.classList.remove('hidden');
                     const matchedSheetsInfo = [planSheetName, shippedSheetName].filter(Boolean).join(' + ');
-                    planText.textContent = `Plan Matched: ${matchedCount}/${globalCargoVolumeRows.length} rows (${matchedSheetsInfo})`;
+                    let planBadge = document.getElementById('status-plan-badge');
+                    if (!planBadge) {
+                        const imgBadge = document.getElementById('status-img-badge');
+                        if (imgBadge && imgBadge.parentNode) {
+                            planBadge = document.createElement('span');
+                            planBadge.id = 'status-plan-badge';
+                            planBadge.className = 'bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full font-semibold border border-indigo-300';
+                            planBadge.innerHTML = `<i class="fa-solid fa-ruler-combined mr-1"></i><span id="status-plan-text"></span>`;
+                            imgBadge.parentNode.insertBefore(planBadge, imgBadge);
+                        }
+                    }
+                    if (planBadge) {
+                        planBadge.classList.remove('hidden');
+                        const planText = document.getElementById('status-plan-text');
+                        if (planText) {
+                            planText.textContent = `Plan Matched: ${matchedCount}/${globalCargoVolumeRows.length} rows (${matchedSheetsInfo})`;
+                        }
+                    }
 
                     buildVendorShipmarkPackages();
                     renderWorkspaceTables();
                     renderShipmarkCards();
 
-                    // Process Column C Mismatches with Modal Popup if any
                     if (mismatchQueue.length > 0) {
                         currentMismatchIdx = 0;
                         showNextMismatchModal();
@@ -1054,7 +1051,6 @@ function formatExcelDate(val) {
                 const cvRow = globalCargoVolumeRows[item.cvIdx];
                 cvRow.colC = item.importVal;
 
-                // Also sync description to TempShipmarkRows so Vendor Shipmark files stay updated
                 const matchingTemp = globalTempShipmarkRows.find(t => t.colE === cvRow.colB && t.colB === cvRow.colQ);
                 if (matchingTemp) {
                     matchingTemp.colD = item.importVal;
@@ -1298,7 +1294,6 @@ function formatExcelDate(val) {
             }
         }
 
-// Live Edit Handler from Tab 1 Table Input Fields (即時更新 E, J, K 畫面而唔重畫成張 Table)
         function updateCargoVolumeCell(idx, field, val) {
             if (!globalCargoVolumeRows[idx]) return;
             globalCargoVolumeRows[idx][field] = val;
@@ -1306,7 +1301,6 @@ function formatExcelDate(val) {
 
             const cvItem = globalCargoVolumeRows[idx];
 
-            // 精準更新畫面上該行嘅 E (Ctn), J (CBM), K (Total CBM) 數值，唔影響目前輸入框 Focus
             const elE = document.getElementById(`cv-cell-e-${idx}`);
             const elJ = document.getElementById(`cv-cell-j-${idx}`);
             const elK = document.getElementById(`cv-cell-k-${idx}`);
@@ -1357,7 +1351,6 @@ function formatExcelDate(val) {
                 }
             });
 
-            // Sort packages by priority: VIETNAM (1) -> OT (2) -> NORMAL (3)
             const typePriority = { 'VIETNAM': 1, 'OT': 2, 'NORMAL': 3 };
             generatedVendorPackages.sort((a, b) => (typePriority[a.type] || 3) - (typePriority[b.type] || 3));
 
@@ -1370,7 +1363,7 @@ function formatExcelDate(val) {
         }
 
         // =========================================================================
-        // 5. EXACT 1:1 EXCELJS GENERATOR (AUTO-FIT, COL A WIDTH 2, RIGHT-SIDE IMAGE)
+        // 5. EXACT 1:1 EXCELJS GENERATOR FOR VENDOR EXCEL
         // =========================================================================
         async function generateExactVendorExcelBuffer(pkg) {
             ensureEmbeddedGraphicsReady();
@@ -1387,7 +1380,6 @@ function formatExcelDate(val) {
                 right: { style: 'thin', color: { argb: 'FF000000' } }
             };
 
-            // Header Row 1: Columns A to L
             const headerVals = ['', 'PO No.', 'Customer', 'Description', 'MFR#', 'VENDOR', 'Country', 'Pack', 'Category', 'L', 'W', 'H'];
             const hRow = ws.getRow(1);
             hRow.height = 19;
@@ -1400,7 +1392,6 @@ function formatExcelDate(val) {
                 cell.border = thinBorder;
             }
 
-            // Data Rows (Starting Row 2, Columns A to L)
             pkg.rows.forEach((r, idx) => {
                 const rNum = idx + 2;
                 const row = ws.getRow(rNum);
@@ -1410,15 +1401,15 @@ function formatExcelDate(val) {
                 const mfr = r.colE !== '' && !isNaN(Number(r.colE)) ? Number(r.colE) : String(r.colE || '');
 
                 const rowVals = [
-                    idx + 1,                    // A: Seq No
-                    po,                         // B: PO No.
-                    r.colC || 'BNTCA',          // C: Customer
-                    r.colD || '',               // D: Description
-                    mfr,                        // E: MFR#
-                    r.colF || '',               // F: VENDOR
-                    r.colG || '',               // G: Country
-                    r.colH !== '' && !isNaN(Number(r.colH)) ? Number(r.colH) : (r.colH || ''), // H: Pack
-                    r.colI || ''                // I: Category
+                    idx + 1,                    // A
+                    po,                         // B
+                    r.colC || 'BNTCA',          // C
+                    r.colD || '',               // D
+                    mfr,                        // E
+                    r.colF || '',               // F
+                    r.colG || '',               // G
+                    r.colH !== '' && !isNaN(Number(r.colH)) ? Number(r.colH) : (r.colH || ''), // H
+                    r.colI || ''                // I
                 ];
 
                 for (let c = 1; c <= 12; c++) {
@@ -1527,17 +1518,15 @@ function formatExcelDate(val) {
                     cS.font = { name: 'PMingLiU', size: 11, bold: true };
                 });
 
-                // Embed UN 3091 Graphic Image on the right side starting at Column M (col: 12.0) top row 1 (row: 0.2)
                 const targetImageBase64 = userUploadedShipmarkImageBase64 || cachedUN3091ImageBase64;
                 const pureTargetBase64 = getPureBase64(targetImageBase64);
                 const unImgId = workbook.addImage({ base64: pureTargetBase64, extension: 'png' });
                 ws.addImage(unImgId, { tl: { col: 12.0, row: 0.2 }, ext: { width: 380, height: 310 } });
             }
 
-            // AUTO-FIT COLUMN WIDTHS (Col A fixed to width 2, others auto-fit)
             ws.columns.forEach((column, colIdx) => {
                 if (colIdx === 0) {
-                    column.width = 2; // Column A width set to 2
+                    column.width = 2;
                     return;
                 }
                 let maxLen = 10;
@@ -1555,9 +1544,9 @@ function formatExcelDate(val) {
         }
 
         // =========================================================================
-        // 6. TABLE RENDERING, LIVE EDITING & EXPORTS
+        // 6. TABLE RENDERING & CARGO VOLUME EXCEL WORKBOOK BUILDER (FIXED FORMULAS & STYLING)
         // =========================================================================
-function renderWorkspaceTables(preserveFocus = false) {
+        function renderWorkspaceTables() {
             const searchKw = (document.getElementById('table-search').value || '').trim().toLowerCase();
             const filteredCV = globalCargoVolumeRows.filter(r => {
                 if (!searchKw) return true;
@@ -1571,56 +1560,231 @@ function renderWorkspaceTables(preserveFocus = false) {
             } else {
                 cvTbody.innerHTML = filteredCV.map((i) => {
                     const realIdx = globalCargoVolumeRows.findIndex(row => row.rowNum === i.rowNum);
+                    const isVietnam = String(i.colM || '').trim().toUpperCase() === 'VIETNAM';
+                    const textStyle = isVietnam ? 'color: blue;' : '';
                     return `
-                        <tr class="hover:bg-blue-50/40 transition-colors">
+                        <tr class="hover:bg-blue-50/40 transition-colors" style="${textStyle}">
                             <td class="py-2 px-3 border-b border-r text-center text-slate-400">${i.rowNum - 1}</td>
-                            <td class="py-2 px-3 border-b border-r font-bold text-blue-600">${escapeHtml(i.colA)}</td>
-                            <td class="py-2 px-3 border-b border-r font-semibold text-slate-800">${escapeHtml(i.colB)}</td>
+                            <td class="py-2 px-3 border-b border-r font-bold">${escapeHtml(i.colA)}</td>
+                            <td class="py-2 px-3 border-b border-r font-semibold">${escapeHtml(i.colB)}</td>
                             <td class="py-2 px-3 border-b border-r">
-                                <input type="text" value="${escapeHtml(i.colC)}" oninput="updateCargoVolumeCell(${realIdx}, 'colC', this.value)" class="w-72 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
+                                <input type="text" value="${escapeHtml(i.colC)}" oninput="updateCargoVolumeCell(${realIdx}, 'colC', this.value)" class="w-72 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500 text-slate-800">
                             </td>
                             <td class="py-2 px-3 border-b border-r text-right">
-                                <input type="text" value="${escapeHtml(i.colD)}" oninput="updateCargoVolumeCell(${realIdx}, 'colD', this.value)" class="w-20 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
+                                <input type="text" value="${escapeHtml(i.colD)}" oninput="updateCargoVolumeCell(${realIdx}, 'colD', this.value)" class="w-20 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500 text-slate-800">
                             </td>
-                            <td id="cv-cell-e-${realIdx}" class="py-2 px-3 border-b border-r text-right text-emerald-700 font-semibold mono-font">${escapeHtml(i.colE)}</td>
+                            <td id="cv-cell-e-${realIdx}" class="py-2 px-3 border-b border-r text-right font-semibold mono-font">${escapeHtml(i.colE)}</td>
                             <td class="py-2 px-3 border-b border-r text-right">
-                                <input type="text" value="${escapeHtml(i.colF)}" oninput="updateCargoVolumeCell(${realIdx}, 'colF', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
-                            </td>
-                            <td class="py-2 px-3 border-b border-r text-right">
-                                <input type="text" value="${escapeHtml(i.colG)}" oninput="updateCargoVolumeCell(${realIdx}, 'colG', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
+                                <input type="text" value="${escapeHtml(i.colF)}" oninput="updateCargoVolumeCell(${realIdx}, 'colF', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500 text-slate-800">
                             </td>
                             <td class="py-2 px-3 border-b border-r text-right">
-                                <input type="text" value="${escapeHtml(i.colH)}" oninput="updateCargoVolumeCell(${realIdx}, 'colH', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500">
+                                <input type="text" value="${escapeHtml(i.colG)}" oninput="updateCargoVolumeCell(${realIdx}, 'colG', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500 text-slate-800">
+                            </td>
+                            <td class="py-2 px-3 border-b border-r text-right">
+                                <input type="text" value="${escapeHtml(i.colH)}" oninput="updateCargoVolumeCell(${realIdx}, 'colH', this.value)" class="w-16 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-right focus:ring-1 focus:ring-blue-500 text-slate-800">
                             </td>
                             <td class="py-2 px-3 border-b border-r text-center">
-                                <input type="text" value="${escapeHtml(i.colI)}" oninput="updateCargoVolumeCell(${realIdx}, 'colI', this.value)" class="w-20 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500">
+                                <input type="text" value="${escapeHtml(i.colI)}" oninput="updateCargoVolumeCell(${realIdx}, 'colI', this.value)" class="w-20 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500 text-slate-800">
                             </td>
                             <td id="cv-cell-j-${realIdx}" class="py-2 px-3 border-b border-r text-right mono-font">${escapeHtml(i.colJ)}</td>
-                            <td id="cv-cell-k-${realIdx}" class="py-2 px-3 border-b border-r text-right font-semibold text-indigo-600 mono-font">${escapeHtml(i.colK)}</td>
-                            <td class="py-2 px-3 border-b border-r font-bold text-slate-800">
-                                <input type="text" value="${escapeHtml(i.colL)}" oninput="updateCargoVolumeCell(${realIdx}, 'colL', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
+                            <td id="cv-cell-k-${realIdx}" class="py-2 px-3 border-b border-r text-right font-semibold mono-font">${escapeHtml(i.colK)}</td>
+                            <td class="py-2 px-3 border-b border-r font-bold">
+                                <input type="text" value="${escapeHtml(i.colL)}" oninput="updateCargoVolumeCell(${realIdx}, 'colL', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500 text-slate-800">
                             </td>
                             <td class="py-2 px-3 border-b border-r">
-                                <input type="text" value="${escapeHtml(i.colM)}" oninput="updateCargoVolumeCell(${realIdx}, 'colM', this.value)" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
+                                <input type="text" value="${escapeHtml(i.colM)}" oninput="updateCargoVolumeCell(${realIdx}, 'colM', this.value)" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500 text-slate-800">
                             </td>
                             <td class="py-2 px-3 border-b border-r">
-                                <input type="text" value="${escapeHtml(i.colN)}" oninput="updateCargoVolumeCell(${realIdx}, 'colN', this.value)" placeholder="mm-dd-yy" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500">
+                                <input type="text" value="${escapeHtml(i.colN)}" oninput="updateCargoVolumeCell(${realIdx}, 'colN', this.value)" placeholder="mm-dd-yy" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500 text-slate-800">
                             </td>
                             <td class="py-2 px-3 border-b border-r">
-                                <input type="text" value="${escapeHtml(i.colO)}" oninput="updateCargoVolumeCell(${realIdx}, 'colO', this.value)" placeholder="mm-dd-yy" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500">
+                                <input type="text" value="${escapeHtml(i.colO)}" oninput="updateCargoVolumeCell(${realIdx}, 'colO', this.value)" placeholder="mm-dd-yy" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-500 text-slate-800">
                             </td>
-                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colP)}" oninput="updateCargoVolumeCell(${realIdx}, 'colP', this.value)" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
-                            <td class="py-2 px-3 border-b border-r font-semibold text-blue-700">
-                                <input type="text" value="${escapeHtml(i.colQ)}" oninput="updateCargoVolumeCell(${realIdx}, 'colQ', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500">
+                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colP)}" oninput="updateCargoVolumeCell(${realIdx}, 'colP', this.value)" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-slate-800"></td>
+                            <td class="py-2 px-3 border-b border-r font-semibold">
+                                <input type="text" value="${escapeHtml(i.colQ)}" oninput="updateCargoVolumeCell(${realIdx}, 'colQ', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:ring-1 focus:ring-blue-500 text-slate-800">
                             </td>
-                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colR)}" oninput="updateCargoVolumeCell(${realIdx}, 'colR', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
-                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colS)}" oninput="updateCargoVolumeCell(${realIdx}, 'colS', this.value)" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
-                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colT)}" oninput="updateCargoVolumeCell(${realIdx}, 'colT', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs"></td>
-                            <td class="py-2 px-3 border-b text-slate-500 font-semibold">${escapeHtml(i.colU)}</td>
+                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colR)}" oninput="updateCargoVolumeCell(${realIdx}, 'colR', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-slate-800"></td>
+                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colS)}" oninput="updateCargoVolumeCell(${realIdx}, 'colS', this.value)" class="w-24 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-slate-800"></td>
+                            <td class="py-2 px-3 border-b border-r"><input type="text" value="${escapeHtml(i.colT)}" oninput="updateCargoVolumeCell(${realIdx}, 'colT', this.value)" class="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs text-slate-800"></td>
+                            <td class="py-2 px-3 border-b font-semibold">${escapeHtml(i.colU)}</td>
                         </tr>
                     `;
                 }).join('');
             }
+        }
+
+        // 使用 ExcelJS 生成 Cargo Volume Excel，並修復公式語法以防範 Excel 報錯提示
+        async function createCargoVolumeExcelBuffer() {
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'Shipping & Shipmark System R5';
+            workbook.created = new Date();
+
+            const ws = workbook.addWorksheet('Cargo Volume', { views: [{ showGridLines: true }] });
+
+            const headers = [
+                "Order", "Asst No.", "Description", "Qty", "Ctn", "L", "W", "H", "Pack", 
+                "CBM", "Total CBM", "Vendor", "C/O", "OBS Date", "QCI Date", 
+                "BNA C/O#", "BNA P/O#", "BNTCA PO#", "Acumatica", "Notes", "Sheet"
+            ];
+
+            const hRow = ws.getRow(1);
+            hRow.height = 20;
+            headers.forEach((h, idx) => {
+                const cell = hRow.getCell(idx + 1);
+                cell.value = h;
+                cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF000000' } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FF000000' } },
+                    left: { style: 'thin', color: { argb: 'FF000000' } },
+                    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                    right: { style: 'thin', color: { argb: 'FF000000' } }
+                };
+            });
+
+            globalCargoVolumeRows.forEach((i, idx) => {
+                const rNum = idx + 2;
+                const row = ws.getRow(rNum);
+                row.height = 18;
+
+                const isVietnam = String(i.colM || '').trim().toUpperCase() === 'VIETNAM';
+                const fontColor = isVietnam ? 'FF0000FF' : 'FF000000'; // 藍色或黑色
+
+                row.getCell(1).value = i.colA;
+                row.getCell(2).value = i.colB;
+                row.getCell(3).value = i.colC;
+                row.getCell(4).value = i.colD !== '' && !isNaN(Number(i.colD)) ? Number(i.colD) : i.colD;
+                
+                // E 欄公式 (修正標準語法)
+                row.getCell(5).value = { formula: `IF(ISBLANK(D${rNum}),"",IF(ISERROR(D${rNum}/I${rNum}),"",D${rNum}/I${rNum}))`, result: i.colE };
+
+                row.getCell(6).value = i.colF !== '' && !isNaN(Number(i.colF)) ? Number(i.colF) : i.colF;
+                row.getCell(7).value = i.colG !== '' && !isNaN(Number(i.colG)) ? Number(i.colG) : i.colG;
+                row.getCell(8).value = i.colH !== '' && !isNaN(Number(i.colH)) ? Number(i.colH) : i.colH;
+                row.getCell(9).value = i.colI !== '' && !isNaN(Number(i.colI)) ? Number(i.colI) : i.colI;
+
+                // J 欄公式 (修正標準語法)
+                row.getCell(10).value = { formula: `IF(OR(F${rNum}="",G${rNum}="",H${rNum}=""),"",IF(ISERROR((F${rNum}*G${rNum}*H${rNum})/1728/35.32),"",(F${rNum}*G${rNum}*H${rNum})/1728/35.32))`, result: i.colJ };
+
+                // K 欄公式 (修正標準語法)
+                row.getCell(11).value = { formula: `IF(OR(E${rNum}="",J${rNum}=""),"",IF(ISERROR(E${rNum}*J${rNum}),"",E${rNum}*J${rNum}))`, result: i.colK };
+
+                row.getCell(12).value = i.colL;
+                row.getCell(13).value = i.colM;
+                row.getCell(14).value = i.colN;
+                row.getCell(15).value = i.colO;
+                row.getCell(16).value = i.colP;
+                row.getCell(17).value = i.colQ;
+                row.getCell(18).value = i.colR;
+                row.getCell(19).value = i.colS;
+                row.getCell(20).value = i.colT;
+                row.getCell(21).value = i.colU;
+
+                for (let c = 1; c <= 21; c++) {
+                    const cObj = row.getCell(c);
+                    cObj.font = { name: 'Calibri', size: 11, color: { argb: fontColor } };
+                    cObj.border = {
+                        top: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+                        left: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+                        bottom: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+                        right: { style: 'thin', color: { argb: 'FFD3D3D3' } }
+                    };
+                }
+            });
+
+            ws.columns.forEach(column => {
+                let maxLen = 10;
+                column.eachCell({ includeEmpty: false }, cell => {
+                    const valStr = String(cell.value || '');
+                    if (valStr.length > maxLen) maxLen = valStr.length;
+                });
+                column.width = Math.min(Math.max(maxLen + 3, 10), 45);
+            });
+
+            return await workbook.xlsx.writeBuffer();
+        }
+
+        async function exportCargoVolumeExcel() {
+            if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload an Order Excel file first.', 'warning');
+            const buffer = await createCargoVolumeExcelBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const monthStr = document.getElementById('menu-c3').value;
+            triggerBlobDownload(blob, `Cargo_Volume_${monthStr}_2026.xlsx`);
+            showToast('Cargo Volume Exported', `Downloaded Cargo_Volume_${monthStr}_2026.xlsx with formulas & Vietnam styling.`, 'success');
+        }
+
+        async function downloadSingleVendorExcel(pkgIdx) {
+            const pkg = generatedVendorPackages[pkgIdx];
+            if (!pkg) return;
+            try {
+                const buffer = await generateExactVendorExcelBuffer(pkg);
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                triggerBlobDownload(blob, pkg.fileName);
+                showToast('Vendor File Downloaded', `Saved ${pkg.fileName} with auto-fit & right-side image.`, 'success');
+            } catch (err) {
+                console.error(err);
+                alert('Error generating Vendor Excel: ' + err.message);
+            }
+        }
+
+        async function downloadAllVendorFilesSequentially() {
+            if (generatedVendorPackages.length === 0) return showToast('No Files', 'No vendor shipmark files to download.', 'warning');
+            showToast('Batch Download Started', `Generating ${generatedVendorPackages.length} formatted Excel files...`, 'info');
+            for (let idx = 0; idx < generatedVendorPackages.length; idx++) {
+                const pkg = generatedVendorPackages[idx];
+                const buffer = await generateExactVendorExcelBuffer(pkg);
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                triggerBlobDownload(blob, pkg.fileName);
+                await new Promise(r => setTimeout(r, 260));
+            }
+            showToast('Batch Download Complete', `Downloaded all ${generatedVendorPackages.length} Vendor Excel files.`, 'success');
+        }
+
+        async function downloadAllVendorShipmarksZip() {
+            if (generatedVendorPackages.length === 0) return showToast('No Files', 'Please import an Order file first.', 'warning');
+            const zip = new JSZip();
+            const monthStr = document.getElementById('menu-c3').value;
+
+            for (const pkg of generatedVendorPackages) {
+                const buffer = await generateExactVendorExcelBuffer(pkg);
+                zip.file(pkg.fileName, buffer);
+            }
+
+            const content = await zip.generateAsync({ type: 'blob' });
+            triggerBlobDownload(content, `Vendor_Shipmarks_${monthStr}_2026.zip`);
+            showToast('ZIP Downloaded', `Packed ${generatedVendorPackages.length} formatted Vendor Shipmark files into ZIP.`, 'success');
+        }
+
+        async function downloadAllOutputsAsZip() {
+            if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload BNTCA Order.xlsx first.', 'warning');
+            const zip = new JSZip();
+            const monthStr = document.getElementById('menu-c3').value;
+
+            const cvBuffer = await createCargoVolumeExcelBuffer();
+            zip.file(`Cargo_Volume_${monthStr}_2026.xlsx`, cvBuffer);
+
+            const vendorFolder = zip.folder(`Vendor_Shipmarks_${monthStr}`);
+            for (const pkg of generatedVendorPackages) {
+                const buffer = await generateExactVendorExcelBuffer(pkg);
+                vendorFolder.file(pkg.fileName, buffer);
+            }
+
+            const content = await zip.generateAsync({ type: 'blob' });
+            triggerBlobDownload(content, `BNTCA_${monthStr}_CargoVolume_And_Shipmarks_FullPack.zip`);
+            showToast('Full Package Exported', `Downloaded Cargo Volume + ${generatedVendorPackages.length} formatted Vendor Shipmark Excels!`, 'success');
+        }
+
+        function triggerBlobDownload(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         // =========================================================================
@@ -1677,7 +1841,6 @@ function renderWorkspaceTables(preserveFocus = false) {
 
             grid.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <!-- Left Column: Vietnam (Red) -->
                     <div class="space-y-4">
                         <div class="bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold px-3 py-2.5 rounded-lg flex items-center justify-between shadow-xs">
                             <span><i class="fa-solid fa-flag mr-1.5"></i> Vietnam Cards (Red)</span>
@@ -1686,7 +1849,6 @@ function renderWorkspaceTables(preserveFocus = false) {
                         ${renderColumnCards(vietPkgs)}
                     </div>
 
-                    <!-- Middle Column: Electronics OT (Amber/Orange) -->
                     <div class="space-y-4">
                         <div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold px-3 py-2.5 rounded-lg flex items-center justify-between shadow-xs">
                             <span><i class="fa-solid fa-bolt mr-1.5"></i> OT Format Cards (Amber)</span>
@@ -1695,7 +1857,6 @@ function renderWorkspaceTables(preserveFocus = false) {
                         ${renderColumnCards(otPkgs)}
                     </div>
 
-                    <!-- Right Column: Standard Normal (Green) -->
                     <div class="space-y-4">
                         <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold px-3 py-2.5 rounded-lg flex items-center justify-between shadow-xs">
                             <span><i class="fa-solid fa-box mr-1.5"></i> Normal Cards (Green)</span>
@@ -1707,102 +1868,6 @@ function renderWorkspaceTables(preserveFocus = false) {
             `;
         }
 
-        function createCargoVolumeWorkbook() {
-            const aoa = [
-                ["Order", "Asst No.", "Description", "Qty", "Ctn", "L", "W", "H", "Pack", "CBM", "Total CBM", "Vendor", "C/O", "OBS Date", "QCI Date", "BNA C/O#", "BNA P/O#", "BNTCA PO#", "Acumatica", "Notes", "Sheet"]
-            ];
-            globalCargoVolumeRows.forEach(i => {
-                aoa.push([
-                    i.colA, i.colB, i.colC, i.colD, i.colE, i.colF, i.colG, i.colH, i.colI,
-                    i.colJ, i.colK, i.colL, i.colM, i.colN, i.colO, i.colP, i.colQ, i.colR, i.colS, i.colT, i.colU
-                ]);
-            });
-            const ws = XLSX.utils.aoa_to_sheet(aoa);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Cargo Volume');
-            return wb;
-        }
-
-        function exportCargoVolumeExcel() {
-            if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload an Order Excel file first.', 'warning');
-            const wb = createCargoVolumeWorkbook();
-            const monthStr = document.getElementById('menu-c3').value;
-            XLSX.writeFile(wb, `Cargo_Volume_${monthStr}_2026.xlsx`);
-            showToast('Cargo Volume Exported', `Downloaded Cargo_Volume_${monthStr}_2026.xlsx`, 'success');
-        }
-
-        async function downloadSingleVendorExcel(pkgIdx) {
-            const pkg = generatedVendorPackages[pkgIdx];
-            if (!pkg) return;
-            try {
-                const buffer = await generateExactVendorExcelBuffer(pkg);
-                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                triggerBlobDownload(blob, pkg.fileName);
-                showToast('Vendor File Downloaded', `Saved ${pkg.fileName} with auto-fit & right-side image.`, 'success');
-            } catch (err) {
-                console.error(err);
-                alert('Error generating Vendor Excel: ' + err.message);
-            }
-        }
-
-        async function downloadAllVendorFilesSequentially() {
-            if (generatedVendorPackages.length === 0) return showToast('No Files', 'No vendor shipmark files to download.', 'warning');
-            showToast('Batch Download Started', `Generating ${generatedVendorPackages.length} formatted Excel files...`, 'info');
-            for (let idx = 0; idx < generatedVendorPackages.length; idx++) {
-                const pkg = generatedVendorPackages[idx];
-                const buffer = await generateExactVendorExcelBuffer(pkg);
-                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                triggerBlobDownload(blob, pkg.fileName);
-                await new Promise(r => setTimeout(r, 260));
-            }
-            showToast('Batch Download Complete', `Downloaded all ${generatedVendorPackages.length} Vendor Excel files.`, 'success');
-        }
-
-        async function downloadAllVendorShipmarksZip() {
-            if (generatedVendorPackages.length === 0) return showToast('No Files', 'Please import an Order file first.', 'warning');
-            const zip = new JSZip();
-            const monthStr = document.getElementById('menu-c3').value;
-
-            for (const pkg of generatedVendorPackages) {
-                const buffer = await generateExactVendorExcelBuffer(pkg);
-                zip.file(pkg.fileName, buffer);
-            }
-
-            const content = await zip.generateAsync({ type: 'blob' });
-            triggerBlobDownload(content, `Vendor_Shipmarks_${monthStr}_2026.zip`);
-            showToast('ZIP Downloaded', `Packed ${generatedVendorPackages.length} formatted Vendor Shipmark files into ZIP.`, 'success');
-        }
-
-        async function downloadAllOutputsAsZip() {
-            if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload BNTCA Order.xlsx first.', 'warning');
-            const zip = new JSZip();
-            const monthStr = document.getElementById('menu-c3').value;
-
-            const wbCV = createCargoVolumeWorkbook();
-            const cvOut = XLSX.write(wbCV, { bookType: 'xlsx', type: 'array' });
-            zip.file(`Cargo_Volume_${monthStr}_2026.xlsx`, cvOut);
-
-            const vendorFolder = zip.folder(`Vendor_Shipmarks_${monthStr}`);
-            for (const pkg of generatedVendorPackages) {
-                const buffer = await generateExactVendorExcelBuffer(pkg);
-                vendorFolder.file(pkg.fileName, buffer);
-            }
-
-            const content = await zip.generateAsync({ type: 'blob' });
-            triggerBlobDownload(content, `BNTCA_${monthStr}_CargoVolume_And_Shipmarks_FullPack.zip`);
-            showToast('Full Package Exported', `Downloaded Cargo Volume + ${generatedVendorPackages.length} formatted Vendor Shipmark Excels!`, 'success');
-        }
-
-        function triggerBlobDownload(blob, filename) {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
         // =========================================================================
         // 8. FULLY EDITABLE PREVIEW MODAL WITH MFR# AUTO-LOAD & ADD/DELETE ITEMS
         // =========================================================================
@@ -1945,7 +2010,7 @@ function renderWorkspaceTables(preserveFocus = false) {
 
             const match = globalTempShipmarkRows.find(r => String(r.colE).trim().toUpperCase() === String(mfrVal).trim().toUpperCase()) ||
                           globalCargoVolumeRows.find(r => String(r.colB).trim().toUpperCase() === String(mfrVal).trim().toUpperCase());
-            
+
             if (match) {
                 pkg.rows[rowIdx].colD = match.colD || match.colC || pkg.rows[rowIdx].colD;
                 pkg.rows[rowIdx].colB = match.colB || match.colQ || pkg.rows[rowIdx].colB;
@@ -1999,304 +2064,6 @@ function renderWorkspaceTables(preserveFocus = false) {
             modal.classList.add('hidden');
             modal.classList.remove('flex');
             currentEditingPkgIdx = null;
-        }
-
-        // =========================================================================
-        // 9. MODULE 1: MATCH L/W/H LOADING PLAN & COLUMN C MISMATCH HANDLER
-        // =========================================================================
-        function findTargetSheetName(sheetNames, primaryTarget, fallbackKeywords) {
-            const pLower = primaryTarget.toLowerCase().trim();
-            // 1. Exact case-insensitive match (e.g., "2026 loading plan" or "Shipped")
-            for (const name of sheetNames) {
-                if (name.toLowerCase().trim() === pLower) return name;
-            }
-            // 2. Fuzzy keyword match (e.g., contains "loading plan", "plan", or "shipped")
-            for (const kw of fallbackKeywords) {
-                const kwLower = kw.toLowerCase();
-                for (const name of sheetNames) {
-                    if (name.toLowerCase().includes(kwLower)) return name;
-                }
-            }
-            return null;
-        }
-
-        function buildPlanDictionaries(ws, dictLIB, dictLB) {
-            if (!ws) return;
-            const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
-            // VBA: For i = 2 To lastRow (0-indexed r = 1 to aoa.length - 1)
-            for (let r = 1; r < aoa.length; r++) {
-                const row = aoa[r];
-                if (!row || row.length === 0) continue;
-
-                // Col B = index 1, Col C = index 2, Col F = index 5, Col G = index 6, Col H = index 7, Col I = index 8, Col L = index 11
-                const vB = String(row[1] !== undefined && row[1] !== null ? row[1] : '').trim();
-                const vC = String(row[2] !== undefined && row[2] !== null ? row[2] : '').trim();
-                const vF = row[5] !== undefined && row[5] !== null ? row[5] : '';
-                const vG = row[6] !== undefined && row[6] !== null ? row[6] : '';
-                const vH = row[7] !== undefined && row[7] !== null ? row[7] : '';
-                const rawI = row[8];
-                const vI = rawI instanceof Date ? `${rawI.getHours()}:${rawI.getMinutes()}` : String(rawI !== undefined && rawI !== null ? rawI : '').trim();
-                const vL = String(row[11] !== undefined && row[11] !== null ? row[11] : '').trim();
-
-                if (!vL && !vB) continue;
-
-                // Normalize keys to uppercase so matching is resilient while preserving last-row overwrite behavior
-                const keyLIB = `${vL.toUpperCase()}|${vI.toUpperCase()}|${vB.toUpperCase()}`;
-                const keyLB = `${vL.toUpperCase()}|${vB.toUpperCase()}`;
-
-                const rowRecord = {
-                    colC: vC,
-                    colF: vF,
-                    colG: vG,
-                    colH: vH,
-                    colI: vI
-                };
-
-                dictLIB[keyLIB] = rowRecord;
-                dictLB[keyLB] = rowRecord;
-            }
-        }
-
-        function parseColonRatioToString(val) {
-            if (val === null || val === undefined || val === '') return '';
-            let str = val instanceof Date ? `${val.getHours()}:${val.getMinutes()}` : String(val).trim();
-            if (str.includes(':')) {
-                const splitArr = str.split(':');
-                let sumRatio = 0;
-                splitArr.forEach(part => {
-                    const tempStr = part.replace(/AM|PM/gi, '').trim();
-                    if (tempStr !== '' && !isNaN(Number(tempStr))) {
-                        sumRatio += Number(tempStr);
-                    }
-                });
-                return String(sumRatio);
-            }
-            return str;
-        }
-
-        function applyModule1FormulasToRow(cvRow) {
-            const valL = String(cvRow.colL || '').trim();
-            if (valL === '') return;
-
-            // Re-read and sum Column I if it contains colons (:)
-            let valI = parseColonRatioToString(cvRow.colI);
-            cvRow.colI = valI !== '' && !isNaN(Number(valI)) ? Number(valI) : valI;
-
-            // Calculate Column J: =(F*G*H)/1728/35.32
-            const L = parseFloat(cvRow.colF);
-            const W = parseFloat(cvRow.colG);
-            const H = parseFloat(cvRow.colH);
-            if (!isNaN(L) && !isNaN(W) && !isNaN(H) && L > 0 && W > 0 && H > 0) {
-                cvRow.colJ = Number(((L * W * H) / 1728 / 35.32).toFixed(6));
-            } else {
-                cvRow.colJ = '';
-            }
-
-            // CRITICAL FIX from Module1.bas: Actively clear Column E first to wipe out any old values
-            cvRow.colE = '';
-            cvRow.colK = '';
-
-            // Check if Column I is a valid numeric non-zero integer
-            if (valI !== '' && !isNaN(Number(valI))) {
-                const dblI = Number(valI);
-                const qty = parseFloat(cvRow.colD);
-                if (Number.isInteger(dblI) && dblI !== 0 && !isNaN(qty)) {
-                    cvRow.colE = Number((qty / dblI).toFixed(2));
-                    if (cvRow.colJ !== '') {
-                        cvRow.colK = Number(((qty / dblI) * cvRow.colJ).toFixed(4));
-                    }
-                }
-            }
-        }
-
-        function handleLoadingPlanMatch(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            if (globalCargoVolumeRows.length === 0) {
-                showToast('Upload Order File First', 'Please upload Step 1 Order Excel (BNTCA) before matching L/W/H Plan.', 'warning');
-                e.target.value = '';
-                return;
-            }
-
-            const planFileName = file.name;
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                try {
-                    const data = new Uint8Array(evt.target.result);
-                    const wbSource = XLSX.read(data, { type: 'array', cellDates: true });
-
-                    // Find "2026 loading plan" (or similar name) and "Shipped" (or similar name)
-                    const planSheetName = findTargetSheetName(wbSource.SheetNames, '2026 loading plan', ['loading plan', 'loading', 'plan']);
-                    const shippedSheetName = findTargetSheetName(wbSource.SheetNames, 'Shipped', ['shipped', 'ship']);
-
-                    if (!planSheetName && !shippedSheetName) {
-                        alert(`Could not find "2026 loading plan" or "Shipped" (or similar sheets) in "${planFileName}".\nAvailable sheets: ${wbSource.SheetNames.join(', ')}`);
-                        e.target.value = '';
-                        return;
-                    }
-
-                    const dictPlanLIB = {}, dictPlanLB = {};
-                    const dictShippedLIB = {}, dictShippedLB = {};
-
-                    if (planSheetName) {
-                        buildPlanDictionaries(wbSource.Sheets[planSheetName], dictPlanLIB, dictPlanLB);
-                    }
-                    if (shippedSheetName) {
-                        buildPlanDictionaries(wbSource.Sheets[shippedSheetName], dictShippedLIB, dictShippedLB);
-                    }
-
-                    mismatchQueue = [];
-                    let matchedCount = 0;
-
-                    // Loop through Target "Cargo Volume" rows and fill data
-                    globalCargoVolumeRows.forEach((cvRow, idx) => {
-                        let valL = String(cvRow.colL || '').trim();
-                        const valB = String(cvRow.colB || '').trim();
-
-                        // Check and sum values in Column I if it contains colons (:)
-                        let valI = parseColonRatioToString(cvRow.colI);
-                        cvRow.colI = valI !== '' && !isNaN(Number(valI)) ? Number(valI) : valI;
-
-                        // Transform Column L values for the Key (DOUBLE -> DOUBLE CHIN, RS -> RIGHT SOURCE)
-                        let lookupL = valL;
-                        if (lookupL.toUpperCase() === 'DOUBLE') {
-                            lookupL = 'DOUBLE CHIN';
-                        } else if (lookupL.toUpperCase() === 'RS') {
-                            lookupL = 'RIGHT SOURCE';
-                        }
-
-                        const isI_Valid = valI !== '' && !isNaN(Number(valI));
-                        const keyLIB = `${lookupL.toUpperCase()}|${String(valI).toUpperCase()}|${valB.toUpperCase()}`;
-                        const keyLB = `${lookupL.toUpperCase()}|${valB.toUpperCase()}`;
-
-                        let matchedRecord = null;
-
-                        if (isI_Valid) {
-                            if (dictPlanLIB[keyLIB]) {
-                                matchedRecord = dictPlanLIB[keyLIB];
-                            } else if (dictShippedLIB[keyLIB]) {
-                                matchedRecord = dictShippedLIB[keyLIB];
-                            }
-                        } else {
-                            if (dictPlanLB[keyLB]) {
-                                matchedRecord = dictPlanLB[keyLB];
-                            } else if (dictShippedLB[keyLB]) {
-                                matchedRecord = dictShippedLB[keyLB];
-                            }
-                        }
-
-                        // Fill Data if matched (F, G, H copied; if I was invalid, copy I; check Col C mismatch)
-                        if (matchedRecord) {
-                            matchedCount++;
-                            cvRow.colF = matchedRecord.colF !== '' && !isNaN(Number(matchedRecord.colF)) ? Number(matchedRecord.colF) : matchedRecord.colF;
-                            cvRow.colG = matchedRecord.colG !== '' && !isNaN(Number(matchedRecord.colG)) ? Number(matchedRecord.colG) : matchedRecord.colG;
-                            cvRow.colH = matchedRecord.colH !== '' && !isNaN(Number(matchedRecord.colH)) ? Number(matchedRecord.colH) : matchedRecord.colH;
-
-                            if (!isI_Valid) {
-                                cvRow.colI = matchedRecord.colI;
-                                const matchingTemp = globalTempShipmarkRows.find(t => t.colE === cvRow.colB && t.colB === cvRow.colQ);
-                                if (matchingTemp) {
-                                    matchingTemp.colH = formatPackRatioDisplay(matchedRecord.colI);
-                                }
-                            }
-
-                            const valCTool = String(cvRow.colC || '').trim();
-                            const valCImport = String(matchedRecord.colC || '').trim();
-
-                            if (valCTool !== valCImport) {
-                                mismatchQueue.push({
-                                    cvIdx: idx,
-                                    rowNum: cvRow.rowNum,
-                                    asstNo: cvRow.colB,
-                                    toolVal: valCTool,
-                                    importVal: valCImport
-                                });
-                            }
-                        }
-
-                        // Apply Step 5 Formulas for Columns J, K, and E
-                        applyModule1FormulasToRow(cvRow);
-                    });
-
-                    // Update UI & Status Badge (auto-create badge in status bar if not present)
-                    const matchedSheetsInfo = [planSheetName, shippedSheetName].filter(Boolean).join(' + ');
-                    let planBadge = document.getElementById('status-plan-badge');
-                    if (!planBadge) {
-                        const imgBadge = document.getElementById('status-img-badge');
-                        if (imgBadge && imgBadge.parentNode) {
-                            planBadge = document.createElement('span');
-                            planBadge.id = 'status-plan-badge';
-                            planBadge.className = 'bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full font-semibold border border-indigo-300';
-                            planBadge.innerHTML = `<i class="fa-solid fa-ruler-combined mr-1"></i><span id="status-plan-text"></span>`;
-                            imgBadge.parentNode.insertBefore(planBadge, imgBadge);
-                        }
-                    }
-                    if (planBadge) {
-                        planBadge.classList.remove('hidden');
-                        const planText = document.getElementById('status-plan-text');
-                        if (planText) {
-                            planText.textContent = `Plan Matched: ${matchedCount}/${globalCargoVolumeRows.length} rows (${matchedSheetsInfo})`;
-                        }
-                    }
-
-                    buildVendorShipmarkPackages();
-                    renderWorkspaceTables();
-                    renderShipmarkCards();
-
-                    // Process Column C Mismatches with Modal Popup if any
-                    if (mismatchQueue.length > 0) {
-                        currentMismatchIdx = 0;
-                        showNextMismatchModal();
-                    } else {
-                        showToast('Data Import & Match Complete', `Matched ${matchedCount} rows from [${matchedSheetsInfo}]. No Column C mismatches found.`, 'success');
-                    }
-                } catch (err) {
-                    console.error(err);
-                    alert('Error matching Loading Plan Excel: ' + err.message);
-                } finally {
-                    e.target.value = '';
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        function showNextMismatchModal() {
-            const modal = document.getElementById('modal-mismatch');
-            if (currentMismatchIdx >= mismatchQueue.length) {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-                buildVendorShipmarkPackages();
-                renderWorkspaceTables();
-                renderShipmarkCards();
-                showToast('Match & Mismatch Review Complete', 'Data import and matching completed successfully!', 'success');
-                return;
-            }
-
-            const item = mismatchQueue[currentMismatchIdx];
-            document.getElementById('mismatch-counter').textContent = `${currentMismatchIdx + 1} / ${mismatchQueue.length}`;
-            document.getElementById('mismatch-row-info').textContent = `#${item.rowNum - 1} (Asst No: ${item.asstNo})`;
-            document.getElementById('mismatch-tool-val').textContent = item.toolVal || '(Blank)';
-            document.getElementById('mismatch-import-val').textContent = item.importVal || '(Blank)';
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        function resolveMismatchChoice(keepTool) {
-            const item = mismatchQueue[currentMismatchIdx];
-            if (!keepTool && item && globalCargoVolumeRows[item.cvIdx]) {
-                const cvRow = globalCargoVolumeRows[item.cvIdx];
-                cvRow.colC = item.importVal;
-
-                // Also sync description to TempShipmarkRows so Vendor Shipmark files stay updated
-                const matchingTemp = globalTempShipmarkRows.find(t => t.colE === cvRow.colB && t.colB === cvRow.colQ);
-                if (matchingTemp) {
-                    matchingTemp.colD = item.importVal;
-                }
-            }
-            currentMismatchIdx++;
-            showNextMismatchModal();
         }
 
         function escapeHtml(str) {
