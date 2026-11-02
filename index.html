@@ -1707,105 +1707,29 @@ function renderWorkspaceTables(preserveFocus = false) {
             `;
         }
 
-// 修改後的 createCargoVolumeWorkbook 函式（支援 Excel 公式與 VIETNAM 整行藍字）
-async function createCargoVolumeWorkbook() {
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'Shipping & Shipmark System R5';
-    workbook.created = new Date();
-
-    const ws = workbook.addWorksheet('Cargo Volume', { views: [{ showGridLines: true }] });
-
-    const thinBorder = {
-        top: { style: 'thin', color: { argb: 'FFD3D3D3' } },
-        left: { style: 'thin', color: { argb: 'FFD3D3D3' } },
-        bottom: { style: 'thin', color: { argb: 'FFD3D3D3' } },
-        right: { style: 'thin', color: { argb: 'FFD3D3D3' } }
-    };
-
-    // 表頭 (Row 1)
-    const headerVals = [
-        "Order", "Asst No.", "Description", "Qty", "Ctn", "L", "W", "H", "Pack", 
-        "CBM", "Total CBM", "Vendor", "C/O", "OBS Date", "QCI Date", 
-        "BNA C/O#", "BNA P/O#", "BNTCA PO#", "Acumatica", "Notes", "Sheet"
-    ];
-    const hRow = ws.getRow(1);
-    hRow.height = 20;
-    for (let c = 1; c <= headerVals.length; c++) {
-        const cell = hRow.getCell(c);
-        cell.value = headerVals[c - 1];
-        cell.font = { name: 'Inter', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } }; // Slate-800
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cell.border = thinBorder;
-    }
-
-    // 資料列 (Row 2 開始)
-    globalCargoVolumeRows.forEach((i, idx) => {
-        const rNum = idx + 2;
-        const row = ws.getRow(rNum);
-        row.height = 18;
-
-        // 檢查 M 欄 (C/O) 是否為 VIETNAM (不分大小寫)
-        const isVietnam = String(i.colM || '').trim().toUpperCase() === 'VIETNAM';
-        const fontColor = isVietnam ? 'FF0000FF' : 'FF1E293B'; // 藍色 (0,0,255) 或預設深色
-
-        // 設定 E、J、K 的 Excel 公式 (若計算出錯或空白則顯示 "")
-        // E列 (Ctn) = d / i
-        const formulaE = `IFERROR(D${rNum}/I${rNum}, "")`;
-        // J列 (CBM) = (f * g * h) / 1 (對應原本運算邏輯)
-        const formulaJ = `IFERROR((F${rNum}*G${rNum}*H${rNum})/1, "")`;
-        // K列 (Total CBM) = d / i * j (即 Qty / Pack * CBM)
-        const formulaK = `IFERROR((D${rNum}/I${rNum})*J${rNum}, "")`;
-
-        const rowVals = [
-            i.colA, i.colB, i.colC, i.colD, 
-            { formula: formulaE }, // E 欄公式
-            i.colF, i.colG, i.colH, i.colI, 
-            { formula: formulaJ }, // J 欄公式
-            { formula: formulaK }, // K 欄公式
-            i.colL, i.colM, i.colN, i.colO, 
-            i.colP, i.colQ, i.colR, i.colS, i.colT, i.colU
-        ];
-
-        for (let c = 1; c <= rowVals.length; c++) {
-            const cell = row.getCell(c);
-            cell.value = rowVals[c - 1];
-            cell.font = { name: 'Inter', size: 10, color: { argb: fontColor } };
-            cell.border = thinBorder;
-
-            // 欄位對齊設定
-            if ([1, 4, 5, 6, 7, 8, 9, 10, 11].includes(c)) {
-                cell.alignment = { vertical: 'middle', horizontal: 'right' };
-            } else if ([2, 13, 14, 15].includes(c)) {
-                cell.alignment = { vertical: 'middle', horizontal: 'center' };
-            } else {
-                cell.alignment = { vertical: 'middle', horizontal: 'left' };
-            }
+        function createCargoVolumeWorkbook() {
+            const aoa = [
+                ["Order", "Asst No.", "Description", "Qty", "Ctn", "L", "W", "H", "Pack", "CBM", "Total CBM", "Vendor", "C/O", "OBS Date", "QCI Date", "BNA C/O#", "BNA P/O#", "BNTCA PO#", "Acumatica", "Notes", "Sheet"]
+            ];
+            globalCargoVolumeRows.forEach(i => {
+                aoa.push([
+                    i.colA, i.colB, i.colC, i.colD, i.colE, i.colF, i.colG, i.colH, i.colI,
+                    i.colJ, i.colK, i.colL, i.colM, i.colN, i.colO, i.colP, i.colQ, i.colR, i.colS, i.colT, i.colU
+                ]);
+            });
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Cargo Volume');
+            return wb;
         }
-    });
 
-    // 自動調整欄寬
-    ws.columns.forEach((column) => {
-        let maxLen = 10;
-        column.eachCell({ includeEmpty: false }, cell => {
-            const valStr = String(cell.value && cell.value.formula ? '12345678' : (cell.value || ''));
-            if (valStr.length > maxLen) maxLen = valStr.length;
-        });
-        column.width = Math.min(Math.max(maxLen + 3, 11), 45);
-    });
-
-    return await workbook.xlsx.writeBuffer();
-}
-
-// 將原本的 exportCargoVolumeExcel 替換為：
-async function exportCargoVolumeExcel() {
-    if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload an Order Excel file first.', 'warning');
-    const monthStr = document.getElementById('menu-c3').value;
-    const buffer = await createCargoVolumeWorkbook();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    triggerBlobDownload(blob, `Cargo_Volume_${monthStr}_2026.xlsx`);
-    showToast('Cargo Volume Exported', `Downloaded Cargo_Volume_${monthStr}_2026.xlsx`, 'success');
-}
+        function exportCargoVolumeExcel() {
+            if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload an Order Excel file first.', 'warning');
+            const wb = createCargoVolumeWorkbook();
+            const monthStr = document.getElementById('menu-c3').value;
+            XLSX.writeFile(wb, `Cargo_Volume_${monthStr}_2026.xlsx`);
+            showToast('Cargo Volume Exported', `Downloaded Cargo_Volume_${monthStr}_2026.xlsx`, 'success');
+        }
 
         async function downloadSingleVendorExcel(pkgIdx) {
             const pkg = generatedVendorPackages[pkgIdx];
@@ -1849,27 +1773,20 @@ async function exportCargoVolumeExcel() {
             showToast('ZIP Downloaded', `Packed ${generatedVendorPackages.length} formatted Vendor Shipmark files into ZIP.`, 'success');
         }
 
-async function downloadAllOutputsAsZip() {
-    if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload BNTCA Order.xlsx first.', 'warning');
-    const zip = new JSZip();
-    const monthStr = document.getElementById('menu-c3').value;
+        async function downloadAllOutputsAsZip() {
+            if (globalCargoVolumeRows.length === 0) return showToast('No Data', 'Please upload BNTCA Order.xlsx first.', 'warning');
+            const zip = new JSZip();
+            const monthStr = document.getElementById('menu-c3').value;
 
-    // 1. 產生 Cargo Volume Excel 的 ExcelJS Buffer 並加入 ZIP
-    const bufferCV = await createCargoVolumeWorkbook();
-    zip.file(`Cargo_Volume_${monthStr}_2026.xlsx`, bufferCV);
+            const wbCV = createCargoVolumeWorkbook();
+            const cvOut = XLSX.write(wbCV, { bookType: 'xlsx', type: 'array' });
+            zip.file(`Cargo_Volume_${monthStr}_2026.xlsx`, cvOut);
 
-    // 2. 依序產生所有 Vendor Shipmark 檔案並放入 Vendor 資料夾
-    const vendorFolder = zip.folder(`Vendor_Shipmarks_${monthStr}`);
-    for (const pkg of generatedVendorPackages) {
-        const buffer = await generateExactVendorExcelBuffer(pkg);
-        vendorFolder.file(pkg.fileName, buffer);
-    }
-
-    // 3. 生成並下載整包 ZIP
-    const content = await zip.generateAsync({ type: 'blob' });
-    triggerBlobDownload(content, `BNTCA_${monthStr}_CargoVolume_And_Shipmarks_FullPack.zip`);
-    showToast('Full Package Exported', `Downloaded Cargo Volume + ${generatedVendorPackages.length} formatted Vendor Shipmark Excels!`, 'success');
-}
+            const vendorFolder = zip.folder(`Vendor_Shipmarks_${monthStr}`);
+            for (const pkg of generatedVendorPackages) {
+                const buffer = await generateExactVendorExcelBuffer(pkg);
+                vendorFolder.file(pkg.fileName, buffer);
+            }
 
             const content = await zip.generateAsync({ type: 'blob' });
             triggerBlobDownload(content, `BNTCA_${monthStr}_CargoVolume_And_Shipmarks_FullPack.zip`);
