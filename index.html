@@ -540,7 +540,7 @@
             { key: 'qty', label: 'Qty', cvCol: 'D', tsCol: '-', matchKeywords: ['qty', 'quantity'] },
             { key: 'pack', label: 'Pack / Asst Ratio', cvCol: 'I', tsCol: '(Internal)', matchKeywords: ['asst ratio', 'pack'] },
             { key: 'vendor', label: 'Vendor / Factory', cvCol: 'L', tsCol: 'F', matchKeywords: ['vendor', 'factory'] },
-            { key: 'co', label: 'C/O / Origin', cvCol: 'M', tsCol: '(Priority Check)', matchKeywords: ['origin', 'c/o', 'country'] },   
+            { key: 'co', label: 'C/O / Origin', cvCol: 'M', tsCol: '(Priority Check)', matchKeywords: ['origin', 'c/o', 'country'] },    
             { key: 'obsDate', label: 'OBS Date', cvCol: 'N', tsCol: '-', matchKeywords: ['obs date'] },
             { key: 'qciDate', label: 'QCI Date', cvCol: 'O', tsCol: '-', matchKeywords: ['qci date', 'qci'] },
             { key: 'bnaCO', label: 'BNA C/O#', cvCol: 'P', tsCol: '-', matchKeywords: ['bna c/o#', 'bna c/o'] },
@@ -800,8 +800,10 @@
         function buildPlanDictionaries(ws, dictLIB, dictLB) {
             if (!ws) return;
             const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+            const aoaFormatted = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
             for (let r = 1; r < aoa.length; r++) {
                 const row = aoa[r];
+                const rowFmt = aoaFormatted[r] || [];
                 if (!row || row.length === 0) continue;
 
                 const vB = String(row[1] !== undefined && row[1] !== null ? row[1] : '').trim();
@@ -810,7 +812,8 @@
                 const vG = row[6] !== undefined && row[6] !== null ? row[6] : '';
                 const vH = row[7] !== undefined && row[7] !== null ? row[7] : '';
                 const rawI = row[8];
-                const vI = rawI instanceof Date ? `${rawI.getHours()}:${rawI.getMinutes()}` : String(rawI !== undefined && rawI !== null ? rawI : '').trim();
+                const fmtI = rowFmt[8];
+                const vI = (rawI instanceof Date && fmtI) ? String(fmtI).trim() : formatPackRatioDisplay(rawI);
                 const vL = String(row[11] !== undefined && row[11] !== null ? row[11] : '').trim();
 
                 if (!vL && !vB) continue;
@@ -833,7 +836,7 @@
 
         function parseColonRatioToString(val) {
             if (val === null || val === undefined || val === '') return '';
-            let str = val instanceof Date ? `${val.getHours()}:${val.getMinutes()}` : String(val).trim();
+            let str = formatPackRatioDisplay(val);
             if (str.includes(':')) {
                 const splitArr = str.split(':');
                 let sumRatio = 0;
@@ -1202,10 +1205,12 @@
                 if (!mapCfg || !mapCfg.order) return;
                 const ws = rawSourceWorkbook.Sheets[sName];
                 const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+                const aoaFormatted = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
                 if (!aoa || aoa.length < 4) return;
 
                 for (let rIdx = 3; rIdx < aoa.length; rIdx++) {
                     const row = aoa[rIdx];
+                    const rowFmt = aoaFormatted[rIdx] || [];
                     if (!row || row.length === 0) continue;
                     const cellOrderVal = String(row[colLetterToIdx(mapCfg.order)] || '').trim();
                     if (cellOrderVal.toLowerCase() === filterVal) {
@@ -1213,11 +1218,20 @@
                             const cIdx = colLetterToIdx(colL);
                             return (cIdx >= 0 && row[cIdx] !== undefined) ? row[cIdx] : '';
                         };
+                        const getFormattedVal = (colL) => {
+                            const cIdx = colLetterToIdx(colL);
+                            return (cIdx >= 0 && rowFmt[cIdx] !== undefined) ? rowFmt[cIdx] : '';
+                        };
 
                         const rawAsstNo = String(getVal(mapCfg.asstNo)).trim();
                         const rawDesc = String(getVal(mapCfg.desc)).trim();
                         const rawQty = getVal(mapCfg.qty);
-                        const rawPack = getVal(mapCfg.pack);
+
+                        // 優先使用儲存格顯示文字 (避免 Excel 把 3:03:02 轉成 Date 物件時漏掉秒數或產生精度偏差)
+                        const rawPackCell = getVal(mapCfg.pack);
+                        const fmtPackCell = getFormattedVal(mapCfg.pack);
+                        const rawPack = (rawPackCell instanceof Date && fmtPackCell) ? fmtPackCell : (fmtPackCell && String(fmtPackCell).includes(':') ? fmtPackCell : rawPackCell);
+
                         const rawVendor = String(getVal(mapCfg.vendor)).trim();
                         const rawCO = String(getVal(mapCfg.co)).trim();
 
@@ -1259,10 +1273,33 @@
             renderShipmarkCards();
         }
 
+        // 修正：保留所有冒號分隔段落（不論 2 段、3 段或更多），並自動消除前導零（例如 "3:03:02" -> "3:3:2"，"09" -> "9"）
         function formatPackRatioDisplay(val) {
             if (val === null || val === undefined || val === '') return '';
-            if (val instanceof Date) return `${val.getHours()}:${val.getMinutes()}`;
-            return String(val).trim();
+            let str = '';
+            if (val instanceof Date) {
+                const h = val.getHours();
+                const m = val.getMinutes();
+                const s = val.getSeconds();
+                str = s > 0 ? `${h}:${m}:${s}` : `${h}:${m}`;
+            } else {
+                str = String(val).trim();
+            }
+
+            if (str.includes(':')) {
+                return str.split(':').map(part => {
+                    const clean = part.replace(/AM|PM/gi, '').trim();
+                    if (clean !== '' && !isNaN(Number(clean))) {
+                        return String(Number(clean));
+                    }
+                    return clean;
+                }).join(':');
+            }
+
+            if (str !== '' && !isNaN(Number(str))) {
+                return String(Number(str));
+            }
+            return str;
         }
 
         function formatPackRatioValue(val) {
@@ -1399,6 +1436,7 @@
 
                 const po = r.colB !== '' && !isNaN(Number(r.colB)) ? Number(r.colB) : String(r.colB || '');
                 const mfr = r.colE !== '' && !isNaN(Number(r.colE)) ? Number(r.colE) : String(r.colE || '');
+                const formattedPackH = formatPackRatioDisplay(r.colH);
 
                 const rowVals = [
                     idx + 1,                    // A
@@ -1408,7 +1446,7 @@
                     mfr,                        // E
                     r.colF || '',               // F
                     r.colG || '',               // G
-                    r.colH !== '' && !isNaN(Number(r.colH)) ? Number(r.colH) : (r.colH || ''), // H
+                    formattedPackH !== '' && !isNaN(Number(formattedPackH)) ? Number(formattedPackH) : formattedPackH, // H
                     r.colI || ''                // I
                 ];
 
